@@ -1,0 +1,81 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #E53521;
+  --color-on-primary: #F6EFDF;
+  --color-primary-container: #ba2818;
+  --color-on-primary-container: #F6EFDF;
+  
+  --color-secondary: #000000;
+  --color-on-secondary: #F6EFDF;
+  
+  --color-background: #F6EFDF;
+  --color-on-background: #000000;
+  
+  --color-surface: #F6EFDF;
+  --color-on-surface: #000000;
+  --color-surface-variant: #ebe4d3;
+  --color-on-surface-variant: #333333;
+  
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #fdfaf4;
+  --color-surface-container: #F6EFDF;
+  --color-surface-container-high: #ebe4d3;
+  --color-surface-container-highest: #dfd8c7;
+  
+  --color-outline: #cccccc;
+  --color-outline-variant: #e0e0e0;
+  
+  --color-error: #ef4444;
+  --color-on-error: #ffffff;
+
+  --font-headline: "Shrikhand", cursive;
+  --font-body: "Montserrat", sans-serif;
+  --font-label: "Montserrat", sans-serif;
+}
+
+body {
+  font-family: var(--font-body);
+  font-weight: 900;
+  background-color: var(--color-background);
+  color: var(--color-on-background);
+}
+
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+  vertical-align: middle;
+}
+
+.editorial-shadow {
+  box-shadow: 0 30px 60px -12px rgba(28, 28, 25, 0.05);
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  height: 4px;
+  width: 4px;
+  display: block;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--color-surface-container-highest);
+  border-radius: 4px;
+}
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-surface-container-highest) transparent;
+}
+
+.asymmetric-border {
+  border-top-left-radius: 2rem;
+  border-bottom-right-radius: 2rem;
+}

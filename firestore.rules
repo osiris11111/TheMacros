@@ -1,0 +1,210 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {userId}
+    // Fields:
+    //   - uid: string (required)
+    //   - email: string (required)
+    //   - name: string (required)
+    //   - role: string (required, 'customer' or 'admin')
+    //   - createdAt: string (optional)
+    //
+    // Collection: orders
+    // Document ID: {orderId}
+    // Fields:
+    //   - id: string (required)
+    //   - userId: string (optional)
+    //   - items: list (required)
+    //   - total: string (required)
+    //   - status: string (required)
+    //   - deliveryDetails: map (required)
+    //   - createdAt: string (required)
+    //
+    // Collection: reviews
+    // Document ID: {reviewId}
+    // Fields:
+    //   - id: string (required)
+    //   - userId: string (required)
+    //   - userName: string (required)
+    //   - rating: number (required)
+    //   - comment: string (optional)
+    //   - createdAt: string (required)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && 
+        (('email' in request.auth.token && request.auth.token.email == "apolokor@gmail.com") ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'));
+    }
+
+    function hasOnlyAllowedFields(allowedFields) {
+      return request.resource.data.keys().hasOnly(allowedFields);
+    }
+
+    function hasRequiredFields(requiredFields) {
+      return request.resource.data.keys().hasAll(requiredFields);
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser() {
+      return hasOnlyAllowedFields(['uid', 'email', 'name', 'role', 'createdAt', 'deliveryInfo', 'favorites']) &&
+             hasRequiredFields(['uid', 'email', 'name', 'role']) &&
+             request.resource.data.uid is string &&
+             request.resource.data.email is string &&
+             request.resource.data.name is string &&
+             request.resource.data.name.size() > 0 && request.resource.data.name.size() < 100 &&
+             request.resource.data.role in ['customer', 'admin'] &&
+             (!('deliveryInfo' in request.resource.data) || request.resource.data.deliveryInfo is map) &&
+             (!('favorites' in request.resource.data) || request.resource.data.favorites is list);
+    }
+
+    function isValidOrder() {
+      return hasOnlyAllowedFields(['id', 'userId', 'guestId', 'items', 'total', 'status', 'deliveryDetails', 'createdAt', 'cancellable', 'promoCode', 'discountAmount']) &&
+             hasRequiredFields(['id', 'items', 'total', 'status', 'deliveryDetails', 'createdAt']) &&
+             request.resource.data.id is string &&
+             (!('guestId' in request.resource.data) || request.resource.data.guestId is string) &&
+             (!('cancellable' in request.resource.data) || request.resource.data.cancellable is bool) &&
+             (!('promoCode' in request.resource.data) || request.resource.data.promoCode is string) &&
+             (!('discountAmount' in request.resource.data) || request.resource.data.discountAmount is string) &&
+             request.resource.data.items is list &&
+             request.resource.data.items.size() > 0 && request.resource.data.items.size() < 100 &&
+             request.resource.data.total is string &&
+             request.resource.data.status in ['pending', 'preparing', 'delivering', 'completed', 'cancelled'] &&
+             request.resource.data.deliveryDetails is map &&
+             request.resource.data.createdAt is string;
+    }
+
+    function isValidReview() {
+      return hasOnlyAllowedFields(['id', 'userId', 'userName', 'orderId', 'rating', 'comment', 'status', 'createdAt']) &&
+             hasRequiredFields(['id', 'userId', 'userName', 'orderId', 'rating', 'status', 'createdAt']) &&
+             request.resource.data.id is string &&
+             request.resource.data.userId is string &&
+             request.resource.data.userName is string &&
+             request.resource.data.userName.size() > 0 && request.resource.data.userName.size() < 100 &&
+             request.resource.data.orderId is string &&
+             request.resource.data.rating is number &&
+             request.resource.data.rating >= 1 && request.resource.data.rating <= 5 &&
+             (!('comment' in request.resource.data) || (request.resource.data.comment is string && request.resource.data.comment.size() <= 1000)) &&
+             request.resource.data.status in ['pending', 'approved', 'rejected'] &&
+             request.resource.data.createdAt is string;
+    }
+
+    function isValidPromo() {
+      return hasOnlyAllowedFields(['id', 'code', 'discountType', 'discountValue', 'maxUsesOverall', 'maxUsesPerUser', 'currentUses', 'usedBy', 'expiryDate']) &&
+             hasRequiredFields(['id', 'code', 'discountType', 'discountValue', 'maxUsesOverall', 'maxUsesPerUser', 'currentUses']) &&
+             request.resource.data.id is string &&
+             request.resource.data.code is string &&
+             request.resource.data.discountType in ['percentage', 'fixed'] &&
+             request.resource.data.discountValue is number &&
+             request.resource.data.maxUsesOverall is number &&
+             request.resource.data.maxUsesPerUser is number &&
+             request.resource.data.currentUses is number &&
+             (!('usedBy' in request.resource.data) || request.resource.data.usedBy is map) &&
+             (!('expiryDate' in request.resource.data) || request.resource.data.expiryDate is string);
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /{document=**} {
+      allow read, write: if false; // Deny by default
+    }
+
+    match /users/{userId} {
+      // Owner can fetch their profile, admin can list and fetch all
+      allow get: if isOwner(userId) || isAdmin();
+      allow list: if isAdmin();
+      
+      // Allow user to create their own profile as 'customer', or admin can create any.
+      allow create: if isAuthenticated() && isValidUser() && 
+                    ((isOwner(userId) && request.resource.data.role == 'customer' && request.resource.data.uid == userId) || isAdmin());
+      // Allow user to update their own profile (but not change role), or admin can update any.
+      allow update: if isAuthenticated() && isValidUser() && 
+                    ((isOwner(userId) && request.resource.data.role == resource.data.role && request.resource.data.uid == resource.data.uid) || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    match /orders/{orderId} {
+      // Owner or guest can fetch their order, admin can fetch and list all. 
+      // If listing orders, rule must enforce the query matches the userId if not admin.
+      allow get: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid) || (!isAuthenticated() && resource.data.guestId != null);
+      allow list: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
+      
+      // Anyone can create an order (including guests). If authenticated, userId must match.
+      allow create: if isValidOrder() && 
+                    (!('userId' in request.resource.data) || request.resource.data.userId == null ||
+                     (isAuthenticated() && request.resource.data.userId == request.auth.uid));
+                     
+      // Only admins can update orders (e.g., change status), OR users can cancel their own orders
+      allow update: if isValidOrder() && (
+                      isAdmin() || 
+                      (isAuthenticated() && 
+                       resource.data.userId == request.auth.uid && 
+                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']) &&
+                       request.resource.data.status == 'cancelled' &&
+                       resource.data.status in ['pending', 'preparing']) ||
+                      (!isAuthenticated() &&
+                       resource.data.guestId != null &&
+                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']) &&
+                       request.resource.data.status == 'cancelled' &&
+                       resource.data.status in ['pending', 'preparing'])
+                    );
+      allow delete: if isAdmin();
+    }
+
+    match /reviews/{reviewId} {
+      // Anyone can read approved reviews, admins can read all, users can read their own
+      allow get: if isAdmin() || resource.data.status == 'approved' || (isAuthenticated() && resource.data.userId == request.auth.uid);
+      allow list: if isAdmin() || resource.data.status == 'approved' || (isAuthenticated() && resource.data.userId == request.auth.uid);
+      
+      // Only authenticated users can create reviews (must be pending)
+      allow create: if isAuthenticated() && isValidReview() && request.resource.data.userId == request.auth.uid && request.resource.data.status == 'pending';
+      
+      // Only admins can update/delete reviews
+      allow update: if isAdmin() && isValidReview();
+      allow delete: if isAdmin();
+    }
+    match /menuItems/{itemId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+    match /menuCategories/{categoryId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+    match /promos/{promoId} {
+      allow get: if true;
+      allow list: if isAdmin();
+      allow create: if isAdmin() && isValidPromo();
+      allow update: if isValidPromo() && (
+        isAdmin() || 
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['currentUses', 'usedBy']) &&
+         request.resource.data.currentUses == resource.data.currentUses + 1)
+      );
+      allow delete: if isAdmin();
+    }
+  }
+}

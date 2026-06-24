@@ -1,0 +1,23 @@
+{
+  "name": "The Macros Factory",
+  "short_name": "MacrosFactory",
+  "description": "The Macros Factory - Fuel Your Fitness",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "icons": [
+    {
+      "src": "https://res.cloudinary.com/dapr6bwus/image/upload/f_auto,q_auto/v1782313348/macroslogo_zcrssn.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://res.cloudinary.com/dapr6bwus/image/upload/f_auto,q_auto/v1782313348/macroslogo_zcrssn.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
