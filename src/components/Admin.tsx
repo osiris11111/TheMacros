@@ -940,60 +940,95 @@ export default function Admin({ user, menuItemsList, categoriesList, setMenuItem
 
       {activeTab === 'analytics' && (
         <section className="mb-12">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-bold">Analytics Dashboard</h2>
-            <div className="flex gap-2 items-center">
+          <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-6 gap-4">
+            <h2 className="text-xl font-bold">Business Dashboard</h2>
+            <div className="flex gap-2 items-center flex-wrap">
               <input type="date" value={exportStartDate} onChange={e => setExportStartDate(e.target.value)} className="p-2 rounded bg-surface border border-outline-variant/30 text-sm" />
               <span className="text-on-surface-variant">to</span>
               <input type="date" value={exportEndDate} onChange={e => setExportEndDate(e.target.value)} className="p-2 rounded bg-surface border border-outline-variant/30 text-sm" />
               <button onClick={exportSalesData} className="bg-primary text-on-primary px-4 py-2 rounded font-bold text-sm">Export Sales Data</button>
             </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-            <div className="bg-surface-container-low p-6 rounded-xl">
-              <h3 className="text-on-surface-variant text-sm font-bold mb-2">Total Revenue</h3>
-              <p className="text-4xl font-headline text-primary">
-                ${orders.reduce((sum, o) => sum + (o.status !== 'cancelled' ? Number(o.total) : 0), 0).toFixed(2)}
-              </p>
-            </div>
-            <div className="bg-surface-container-low p-6 rounded-xl">
-              <h3 className="text-on-surface-variant text-sm font-bold mb-2">Total Orders</h3>
-              <p className="text-4xl font-headline text-primary">
-                {orders.filter(o => o.status !== 'cancelled').length}
-              </p>
-            </div>
-          </div>
-          
-          <div className="bg-surface-container-low p-6 rounded-xl overflow-x-auto w-full">
-            <h3 className="text-on-surface-variant text-sm font-bold mb-6">Orders Over Time</h3>
-            <div className="w-full h-[300px] min-w-[600px]">
-              {(() => {
-                const dataByDate = orders.filter(o => o.status !== 'cancelled').reduce((acc, o) => {
-                  const date = new Date(o.createdAt).toLocaleDateString();
-                  if (!acc[date]) acc[date] = { date, revenue: 0, orders: 0 };
-                  acc[date].revenue += Number(o.total);
-                  acc[date].orders += 1;
-                  return acc;
-                }, {} as Record<string, {date: string, revenue: number, orders: number}>);
-                
-                const chartData = Object.values(dataByDate).sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
-                
-                return chartData.length > 0 ? (
-                  <ResponsiveContainer width="99%" height={300}>
-                    <LineChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
-                      <Line type="monotone" dataKey="revenue" stroke="#E4CD86" strokeWidth={3} />
-                      <CartesianGrid stroke="#ccc" strokeDasharray="5 5" opacity={0.2} />
-                      <XAxis dataKey="date" stroke="#888" />
-                      <YAxis stroke="#888" />
-                      <Tooltip contentStyle={{ backgroundColor: '#1E1E1E', border: 'none', borderRadius: '8px', color: '#fff' }} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="flex items-center justify-center h-full text-on-surface-variant">Not enough data to display chart.</div>
-                );
-              })()}
-            </div>
-          </div>
+          {(() => {
+            const validOrders = orders.filter(o => o.status !== 'cancelled' && !o.isDeleted);
+            const totalRevenue = validOrders.reduce((sum, o) => sum + Number(o.total), 0);
+            const totalOrders = validOrders.length;
+            const aov = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+            
+            // Top selling items
+            const itemCounts = validOrders.flatMap(o => o.items).reduce((acc, item) => {
+              acc[item.title] = (acc[item.title] || 0) + (item.quantity || 1);
+              return acc;
+            }, {} as Record<string, number>);
+            const topItems = Object.entries(itemCounts).map(([title, quantity]) => ({ title, quantity })).sort((a, b) => b.quantity - a.quantity).slice(0, 5);
+
+            // Chart data: Last 7 Days
+            const chartData = Array.from({ length: 7 }).map((_, i) => {
+                const d = new Date();
+                d.setDate(d.getDate() - (6 - i));
+                const dateStr = d.toLocaleDateString();
+                return { date: dateStr, revenue: 0, orders: 0 };
+            });
+
+            validOrders.forEach(o => {
+                const dateStr = new Date(o.createdAt).toLocaleDateString();
+                const dayData = chartData.find(d => d.date === dateStr);
+                if (dayData) {
+                    dayData.revenue += Number(o.total);
+                    dayData.orders += 1;
+                }
+            });
+
+            return (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    <div className="bg-surface-container-low p-6 rounded-xl flex flex-col justify-center">
+                      <h3 className="text-on-surface-variant text-sm font-bold mb-2">Total Revenue</h3>
+                      <p className="text-4xl font-headline text-primary">${totalRevenue.toFixed(2)}</p>
+                    </div>
+                    <div className="bg-surface-container-low p-6 rounded-xl flex flex-col justify-center">
+                      <h3 className="text-on-surface-variant text-sm font-bold mb-2">Total Orders</h3>
+                      <p className="text-4xl font-headline text-primary">{totalOrders}</p>
+                    </div>
+                    <div className="bg-surface-container-low p-6 rounded-xl flex flex-col justify-center">
+                      <h3 className="text-on-surface-variant text-sm font-bold mb-2">Avg. Order Value</h3>
+                      <p className="text-4xl font-headline text-primary">${aov.toFixed(2)}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                    <div className="bg-surface-container-low p-6 rounded-xl col-span-1 lg:col-span-2 overflow-hidden w-full">
+                        <h3 className="text-on-surface-variant text-sm font-bold mb-6">Revenue (Last 7 Days)</h3>
+                        <div className="w-full h-[300px]">
+                            <ResponsiveContainer width="99%" height={300}>
+                              <LineChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+                                <Line type="monotone" dataKey="revenue" stroke="#E4CD86" strokeWidth={3} dot={{ r: 4, fill: '#E4CD86' }} activeDot={{ r: 6 }} />
+                                <CartesianGrid stroke="#ccc" strokeDasharray="5 5" opacity={0.2} vertical={false} />
+                                <XAxis dataKey="date" stroke="#888" tickLine={false} axisLine={false} tick={{ fontSize: 12 }} />
+                                <YAxis stroke="#888" tickFormatter={(val) => `$${val}`} tickLine={false} axisLine={false} tick={{ fontSize: 12 }} />
+                                <Tooltip formatter={(value: number) => [`$${value.toFixed(2)}`, 'Revenue']} contentStyle={{ backgroundColor: '#1E1E1E', border: 'none', borderRadius: '8px', color: '#fff' }} />
+                              </LineChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
+                    
+                    <div className="bg-surface-container-low p-6 rounded-xl col-span-1 flex flex-col">
+                        <h3 className="text-on-surface-variant text-sm font-bold mb-6">Top Selling Items</h3>
+                        <div className="flex-grow flex flex-col gap-4">
+                            {topItems.length > 0 ? topItems.map((item, index) => (
+                                <div key={index} className="flex justify-between items-center bg-surface p-3 rounded border border-outline-variant/20">
+                                    <span className="font-bold text-sm truncate pr-4">{item.title}</span>
+                                    <span className="bg-primary/20 text-primary font-bold px-2 py-1 rounded text-xs whitespace-nowrap">{item.quantity} sold</span>
+                                </div>
+                            )) : (
+                                <div className="text-sm text-on-surface-variant flex items-center justify-center h-full">No items sold yet.</div>
+                            )}
+                        </div>
+                    </div>
+                  </div>
+                </>
+            );
+          })()}
         </section>
       )}
 
