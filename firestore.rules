@@ -148,9 +148,8 @@ service cloud.firestore {
     }
 
     match /orders/{orderId} {
-      // Owner or guest can fetch their order, admin can fetch and list all. 
-      // If listing orders, rule must enforce the query matches the userId if not admin.
-      allow get: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid) || (!isAuthenticated() && resource.data.guestId != null);
+      // Owner can fetch their order, admin can fetch and list all. 
+      allow get: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
       allow list: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
       
       // Anyone can create an order (including guests). If authenticated, userId must match.
@@ -163,11 +162,6 @@ service cloud.firestore {
                       isAdmin() || 
                       (isAuthenticated() && 
                        resource.data.userId == request.auth.uid && 
-                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']) &&
-                       request.resource.data.status == 'cancelled' &&
-                       resource.data.status in ['pending', 'preparing']) ||
-                      (!isAuthenticated() &&
-                       resource.data.guestId != null &&
                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']) &&
                        request.resource.data.status == 'cancelled' &&
                        resource.data.status in ['pending', 'preparing'])
@@ -198,13 +192,7 @@ service cloud.firestore {
     match /promos/{promoId} {
       allow get: if true;
       allow list: if isAdmin();
-      allow create: if isAdmin() && isValidPromo();
-      allow update: if isValidPromo() && (
-        isAdmin() || 
-        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['currentUses', 'usedBy']) &&
-         request.resource.data.currentUses == resource.data.currentUses + 1)
-      );
-      allow delete: if isAdmin();
+      allow create, update, delete: if isAdmin();
     }
   }
 }

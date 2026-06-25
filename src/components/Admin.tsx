@@ -200,44 +200,6 @@ export default function Admin({ user, menuItemsList, categoriesList, setMenuItem
     }
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const img = new Image();
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          let width = img.width;
-          let height = img.height;
-          const max_size = 800;
-          
-          if (width > height) {
-            if (width > max_size) {
-              height *= max_size / width;
-              width = max_size;
-            }
-          } else {
-            if (height > max_size) {
-              width *= max_size / height;
-              height = max_size;
-            }
-          }
-          
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          ctx?.drawImage(img, 0, 0, width, height);
-          
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
-          setImageUpload(dataUrl);
-        };
-        img.src = reader.result as string;
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
   const saveMenuItem = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
@@ -502,6 +464,49 @@ export default function Admin({ user, menuItemsList, categoriesList, setMenuItem
     a.setAttribute('download', `sales_export_${exportStartDate}_to_${exportEndDate}.csv`);
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const optimizeImages = async () => {
+    try {
+      const querySnapshot = await getDocs(collection(db, 'menuItems'));
+      let updatedCount = 0;
+
+      for (const document of querySnapshot.docs) {
+        const data = document.data();
+        const imgUrl = data.img;
+
+        if (imgUrl && typeof imgUrl === 'string' && imgUrl.includes('res.cloudinary.com')) {
+          const parts = imgUrl.split('/upload/');
+          if (parts.length === 2) {
+            const pathAfterUpload = parts[1];
+            const urlParts = pathAfterUpload.split('/');
+            
+            // Remove existing transformations like f_auto, q_auto, w_600, c_limit
+            const cleanedParts = urlParts.filter(part => !part.includes('f_auto') && !part.includes('q_auto') && !part.includes('w_600') && !part.includes('c_limit') && !part.includes('w_') && !part.includes('c_') && !part.includes('f_') && !part.includes('q_') || /^v\d+$/.test(part));
+            
+            // We just need to reconstruct properly. Wait, it's safer to find the version `v...` and just take everything after it including the version.
+            const versionIndex = urlParts.findIndex(part => /^v\d+$/.test(part));
+            let pathRest = '';
+            if (versionIndex !== -1) {
+                pathRest = urlParts.slice(versionIndex).join('/');
+            } else {
+                pathRest = urlParts[urlParts.length - 1]; // Fallback to just the file name
+            }
+
+            const newUrl = `${parts[0]}/upload/f_auto,q_auto,w_600,c_limit/${pathRest}`;
+            
+            if (newUrl !== imgUrl) {
+              await updateDoc(doc(db, 'menuItems', document.id), { img: newUrl });
+              updatedCount++;
+            }
+          }
+        }
+      }
+      alert(`Successfully optimized ${updatedCount} menu item images!`);
+    } catch (error) {
+      console.error("Error optimizing images:", error);
+      alert("Failed to optimize images. Check console.");
+    }
   };
 
   const filteredOrders = orders.filter(o => !o.isDeleted && (o.id.toLowerCase().includes(orderSearch.toLowerCase()) || o.deliveryDetails?.name?.toLowerCase().includes(orderSearch.toLowerCase())));
@@ -947,6 +952,7 @@ export default function Admin({ user, menuItemsList, categoriesList, setMenuItem
               <span className="text-on-surface-variant">to</span>
               <input type="date" value={exportEndDate} onChange={e => setExportEndDate(e.target.value)} className="p-2 rounded bg-surface border border-outline-variant/30 text-sm" />
               <button onClick={exportSalesData} className="bg-primary text-on-primary px-4 py-2 rounded font-bold text-sm">Export Sales Data</button>
+              <button onClick={optimizeImages} className="bg-secondary text-on-secondary px-4 py-2 rounded font-bold text-sm">Optimize Images</button>
             </div>
           </div>
           {(() => {
@@ -1076,11 +1082,9 @@ export default function Admin({ user, menuItemsList, categoriesList, setMenuItem
                           </div>
                         )}
                         <div>
-                            <label className="block text-xs font-bold mb-1">Image URL or Upload</label>
+                            <label className="block text-xs font-bold mb-1">Image URL</label>
                             <div className="flex flex-col gap-2">
                               <input name="img" defaultValue={editingItem.img} placeholder="Image URL" className="w-full p-3 rounded bg-surface-container-low border border-outline-variant/30 text-sm" />
-                              <input type="file" accept="image/*" onChange={handleImageUpload} className="text-sm" />
-                              {imageUpload && <span className="text-xs text-primary font-bold">Image loaded from file</span>}
                             </div>
                         </div>
                         <div>

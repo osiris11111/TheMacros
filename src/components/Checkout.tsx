@@ -213,15 +213,6 @@ export default function Checkout({ setView, cartItems, setCartItems, user, isBag
 
     try {
       await setDoc(doc(db, 'orders', orderData.id), orderData);
-      
-      if (appliedPromo) {
-        const promoRef = doc(db, 'promos', appliedPromo.code);
-        const updates: any = { currentUses: appliedPromo.currentUses + 1 };
-        if (user) {
-          updates[`usedBy.${user.uid}`] = (appliedPromo.usedBy?.[user.uid] || 0) + 1;
-        }
-        await updateDoc(promoRef, updates);
-      }
 
       setCartItems([]);
       setView('profile'); // Redirect to profile/orders
