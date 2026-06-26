@@ -141,7 +141,7 @@ function Home({ setView }: { setView: (view: string) => void }) {
 
 function MenuCardItem({ item, idx, favorites, toggleFavorite, onSelect, menuItemsList }: any) {
   const [selectedSize, setSelectedSize] = React.useState<string | null>(
-    (item.showOptionsOnCard && item.sizes && item.sizes.length > 0) ? item.sizes[0].label : null
+    (item.sizes && item.sizes.length > 0 && (item.showOptionsOnCard || item.sizes.length === 1)) ? item.sizes[0].label : null
   );
 
   const displayPrice = selectedSize 
@@ -170,7 +170,7 @@ function MenuCardItem({ item, idx, favorites, toggleFavorite, onSelect, menuItem
         </div>
         <p className="text-on-surface-variant text-xs line-clamp-2 mt-1 mb-2">{item.desc}</p>
         
-        {item.showOptionsOnCard && item.sizes && item.sizes.length > 0 && (
+        {(item.sizes && item.sizes.length > 0 && (item.showOptionsOnCard || item.sizes.length === 1)) && (
           <div className="flex flex-wrap gap-2 mb-2" onClick={e => e.stopPropagation()}>
             {item.sizes.map((size: any) => (
               <button 
@@ -488,14 +488,20 @@ function Menu({ setView, cartItems, setCartItems, isAdmin, isBagOpen, setIsBagOp
                                 )}
                                 {sizeSelection && (() => {
                                   const selectedSizeObj = modalItem.sizes.find(s => s.label === sizeSelection);
-                                  if (selectedSizeObj && (selectedSizeObj.protein || selectedSizeObj.carbs || selectedSizeObj.fats)) {
+                                  if (selectedSizeObj && (selectedSizeObj.protein || selectedSizeObj.carbs || selectedSizeObj.fats || (modalItem.sizes.length === 1 && selectedSizeObj.label))) {
                                     return (
-                                      <div className="mt-3 p-3 rounded-xl border border-outline-variant/30 bg-surface-container-low flex justify-center items-center text-sm font-medium text-on-surface-variant">
-                                        {selectedSizeObj.protein && <span className="font-bold">Pro: {selectedSizeObj.protein}g</span>}
-                                        {selectedSizeObj.protein && (selectedSizeObj.carbs || selectedSizeObj.fats) && <span className="mx-2 opacity-50 font-bold">•</span>}
-                                        {selectedSizeObj.carbs && <span className="font-bold">Carbs: {selectedSizeObj.carbs}g</span>}
-                                        {selectedSizeObj.carbs && selectedSizeObj.fats && <span className="mx-2 opacity-50 font-bold">•</span>}
-                                        {selectedSizeObj.fats && <span className="font-bold">Fat: {selectedSizeObj.fats}g</span>}
+                                      <div className="mt-3 p-3 rounded-xl border border-outline-variant/30 bg-surface-container-low flex justify-center items-center text-sm font-medium text-on-surface-variant flex-wrap gap-2">
+                                        {modalItem.sizes.length === 1 && selectedSizeObj.label && (
+                                          <span className="font-bold text-on-surface whitespace-nowrap">{selectedSizeObj.label}</span>
+                                        )}
+                                        {modalItem.sizes.length === 1 && selectedSizeObj.label && (selectedSizeObj.protein || selectedSizeObj.carbs || selectedSizeObj.fats) && (
+                                          <span className="opacity-50 font-bold">•</span>
+                                        )}
+                                        {selectedSizeObj.protein && <span className="font-bold whitespace-nowrap">Pro: {selectedSizeObj.protein}g</span>}
+                                        {selectedSizeObj.protein && (selectedSizeObj.carbs || selectedSizeObj.fats) && <span className="opacity-50 font-bold">•</span>}
+                                        {selectedSizeObj.carbs && <span className="font-bold whitespace-nowrap">Carbs: {selectedSizeObj.carbs}g</span>}
+                                        {selectedSizeObj.carbs && selectedSizeObj.fats && <span className="opacity-50 font-bold">•</span>}
+                                        {selectedSizeObj.fats && <span className="font-bold whitespace-nowrap">Fat: {selectedSizeObj.fats}g</span>}
                                       </div>
                                     );
                                   }
