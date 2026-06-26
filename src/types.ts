@@ -29,6 +29,13 @@ export type MenuItem = {
   allowSauces?: boolean;
   sauces?: string[];
   comboItems?: string[];
+  calories?: string;
+  caloriesLarge?: string;
+  proteinLarge?: string;
+  carbsLarge?: string;
+  fatLarge?: string;
+  priceLarge?: string;
+  outOfStock?: boolean;
 };
 
 export type MenuCategory = { id: string; name: string; order: number };

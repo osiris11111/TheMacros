@@ -150,7 +150,7 @@ function MenuCardItem({ item, idx, favorites, toggleFavorite, onSelect, menuItem
 
   return (
     <div 
-      className={`flex gap-4 bg-surface-container-low p-4 rounded-xl transition relative ${item.available === false ? 'opacity-60 grayscale-[50%]' : 'cursor-pointer hover:bg-surface-container-high'}`} 
+      className={`flex gap-4 bg-surface-container-low p-4 rounded-xl transition relative ${item.available === false || item.outOfStock ? 'opacity-60 grayscale-[50%]' : 'cursor-pointer hover:bg-surface-container-high'}`} 
       onClick={() => {
         if (item.available !== false) {
           onSelect(item, selectedSize);
@@ -186,9 +186,14 @@ function MenuCardItem({ item, idx, favorites, toggleFavorite, onSelect, menuItem
 
         <span className="font-label text-primary font-bold mt-auto">${displayPrice.replace('$', '')}</span>
       </div>
-      {item.available === false && (
+      {item.available === false && !item.outOfStock && (
         <div className="absolute top-2 right-2 bg-error text-on-error px-2 py-1 text-[10px] uppercase tracking-wider font-bold rounded shadow-sm">
           Unavailable
+        </div>
+      )}
+      {item.outOfStock && (
+        <div className="absolute top-2 right-2 bg-error text-on-error px-2 py-1 text-[10px] uppercase tracking-wider font-bold rounded shadow-sm">
+          Out of Stock
         </div>
       )}
     </div>
@@ -256,7 +261,12 @@ function Menu({ setView, cartItems, setCartItems, isAdmin, isBagOpen, setIsBagOp
 
   useEffect(() => {
     if (categoriesList.length > 0 && !activeCategory) {
-      setActiveCategory(categoriesList[0].name);
+      const visibleCats = categoriesList.filter(c => c.name.toLowerCase() !== 'others');
+      if (visibleCats.length > 0) {
+        setActiveCategory(visibleCats[0].name);
+      } else {
+        setActiveCategory(categoriesList[0].name);
+      }
     }
   }, [categoriesList, activeCategory]);
 
@@ -371,7 +381,7 @@ function Menu({ setView, cartItems, setCartItems, isAdmin, isBagOpen, setIsBagOp
            Array.from({ length: 4 }).map((_, i) => (
              <div key={`cat-skel-${i}`} className="shrink-0 snap-start px-6 py-4 rounded-full bg-surface-container-high animate-pulse w-24"></div>
            ))
-        ) : categoriesList.map(category => (
+        ) : categoriesList.filter(c => c.name.toLowerCase() !== 'others').map(category => (
           <button 
             key={category.id} 
             onClick={() => setActiveCategory(category.name)}
@@ -511,6 +521,7 @@ function Menu({ setView, cartItems, setCartItems, isAdmin, isBagOpen, setIsBagOp
 
                             <button 
                               onClick={() => {
+                                if (modalItem.outOfStock) return;
                                 if (modalItem.sizes && modalItem.sizes.length > 0 && !sizeSelection) {
                                   alert('Please select a size');
                                   return;
@@ -521,9 +532,10 @@ function Menu({ setView, cartItems, setCartItems, isAdmin, isBagOpen, setIsBagOp
                                   handleAddToOrder();
                                 }
                               }} 
-                              className="w-full bg-primary text-on-primary py-4 rounded-xl font-bold flex items-center justify-center gap-2"
+                              disabled={modalItem.outOfStock}
+                              className={`w-full py-4 rounded-xl font-bold flex items-center justify-center gap-2 ${modalItem.outOfStock ? 'bg-surface-container-highest text-on-surface-variant cursor-not-allowed opacity-50' : 'bg-primary text-on-primary'}`}
                             >
-                                {(modalItem.allowFriesAndDrink || modalItem.allowSauces) ? 
+                                {modalItem.outOfStock ? 'Out of Stock' : (modalItem.allowFriesAndDrink || modalItem.allowSauces) ? 
                                   <>Next: Add-ons <span className="material-symbols-outlined">arrow_forward</span></> : 
                                   <>Add to Order <span className="material-symbols-outlined">add_shopping_cart</span></>}
                             </button>
@@ -802,10 +814,16 @@ function AppContent() {
         try {
             if (cachedCats) {
                 currentCats = JSON.parse(cachedCats);
+                if (!currentCats.some(c => c.name.toLowerCase() === 'others')) {
+                    currentCats.push({ id: 'cat-others', name: 'Others', order: 999 });
+                }
                 setCategories(currentCats);
             } else {
                 const catsSnap = await getDocs(collection(db, 'menuCategories'));
                 currentCats = catsSnap.docs.map(d => ({id: d.id, ...d.data()} as MenuCategory)).sort((a, b) => a.order - b.order);
+                if (!currentCats.some(c => c.name.toLowerCase() === 'others')) {
+                    currentCats.push({ id: 'cat-others', name: 'Others', order: 999 });
+                }
                 setCategories(currentCats);
                 sessionStorage.setItem('cats_session_cache', JSON.stringify(currentCats));
             }

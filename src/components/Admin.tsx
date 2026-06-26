@@ -28,6 +28,9 @@ export default function Admin({ user, menuItemsList, categoriesList, setMenuItem
   const [price700, setPrice700] = useState('');
   const [macros450, setMacros450] = useState({ protein: '', carbs: '', fats: '' });
   const [macros700, setMacros700] = useState({ protein: '', carbs: '', fats: '' });
+  const [editingItemOutOfStock, setEditingItemOutOfStock] = useState(false);
+  const [editingItemCalories, setEditingItemCalories] = useState('');
+  const [editingItemCaloriesLarge, setEditingItemCaloriesLarge] = useState('');
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
   const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null);
 
@@ -56,18 +59,21 @@ export default function Admin({ user, menuItemsList, categoriesList, setMenuItem
     setImageUpload('');
     if (item) {
       setEditingItemSizes(item.sizes || []);
-      const size450 = item.sizes?.find(s => s.label === '450 Cal');
-      const size700 = item.sizes?.find(s => s.label === '700 Cal');
-      setPrice450(size450?.price || '');
-      setPrice700(size700?.price || '');
-      setMacros450({ protein: size450?.protein || '', carbs: size450?.carbs || '', fats: size450?.fats || '' });
-      setMacros700({ protein: size700?.protein || '', carbs: size700?.carbs || '', fats: size700?.fats || '' });
+      const size1 = item.sizes?.[0];
+      const size2 = item.sizes?.[1];
+      setPrice450(size1?.price || '');
+      setPrice700(size2?.price || '');
+      setMacros450({ protein: size1?.protein || '', carbs: size1?.carbs || '', fats: size1?.fats || '' });
+      setMacros700({ protein: size2?.protein || '', carbs: size2?.carbs || '', fats: size2?.fats || '' });
       setEditingItemAllowFries(item.allowFriesAndDrink || false);
       setEditingItemAllowSauces(item.allowSauces || false);
       setEditingItemSauces(item.sauces || []);
       setEditingItemCategories(item.categories || (item.category ? [item.category] : []));
       setEditingItemShowOptions(item.showOptionsOnCard || false);
       setEditingItemCombos(item.comboItems || []);
+      setEditingItemOutOfStock(item.outOfStock || false);
+      setEditingItemCalories(item.calories || '');
+      setEditingItemCaloriesLarge(item.caloriesLarge || '');
     } else {
       setEditingItemSizes([]);
       setPrice450('');
@@ -80,6 +86,9 @@ export default function Admin({ user, menuItemsList, categoriesList, setMenuItem
       setEditingItemCategories([]);
       setEditingItemShowOptions(false);
       setEditingItemCombos([]);
+      setEditingItemOutOfStock(false);
+      setEditingItemCalories('');
+      setEditingItemCaloriesLarge('');
     }
   };
 
@@ -231,8 +240,8 @@ export default function Admin({ user, menuItemsList, categoriesList, setMenuItem
 
     const itemSizes = editingItemShowOptions 
       ? [
-          { label: '450 Cal', price: price450, protein: macros450.protein, carbs: macros450.carbs, fats: macros450.fats },
-          { label: '700 Cal', price: price700, protein: macros700.protein, carbs: macros700.carbs, fats: macros700.fats }
+          { label: `${editingItemCalories || '450'} Cal`, price: price450, protein: macros450.protein, carbs: macros450.carbs, fats: macros450.fats },
+          { label: `${editingItemCaloriesLarge || '700'} Cal`, price: price700, protein: macros700.protein, carbs: macros700.carbs, fats: macros700.fats }
         ].filter(s => s.price) 
       : editingItemSizes;
 
@@ -260,6 +269,9 @@ export default function Admin({ user, menuItemsList, categoriesList, setMenuItem
       prepTime: formData.get('prepTime'),
       ingredients: formData.get('ingredients'),
       available: editingItem?.available !== false,
+      outOfStock: editingItemOutOfStock,
+      calories: editingItemCalories,
+      caloriesLarge: editingItemCaloriesLarge,
       sizes: itemSizes,
       allowFriesAndDrink: editingItemAllowFries,
       allowSauces: editingItemAllowSauces,
@@ -966,7 +978,7 @@ export default function Admin({ user, menuItemsList, categoriesList, setMenuItem
               acc[item.title] = (acc[item.title] || 0) + (item.quantity || 1);
               return acc;
             }, {} as Record<string, number>);
-            const topItems = Object.entries(itemCounts).map(([title, quantity]) => ({ title, quantity })).sort((a, b) => b.quantity - a.quantity).slice(0, 5);
+            const topItems = Object.entries(itemCounts).map(([title, quantity]) => ({ title, quantity: quantity as number })).sort((a, b) => b.quantity - a.quantity).slice(0, 5);
 
             // Chart data: Last 7 Days
             const chartData = Array.from({ length: 7 }).map((_, i) => {
@@ -1052,6 +1064,17 @@ export default function Admin({ user, menuItemsList, categoriesList, setMenuItem
                             <label className="block text-xs font-bold mb-1">Title</label>
                             <input name="title" defaultValue={editingItem.title} required className="w-full p-3 rounded bg-surface-container-low border border-outline-variant/30 text-sm" />
                         </div>
+                        <div className="flex items-center mt-6">
+                            <label className="flex items-center gap-2 cursor-pointer text-sm">
+                                <input 
+                                  type="checkbox"
+                                  className="rounded text-primary"
+                                  checked={editingItemOutOfStock}
+                                  onChange={e => setEditingItemOutOfStock(e.target.checked)}
+                                />
+                                <span className="font-bold">Mark as Out of Stock</span>
+                            </label>
+                        </div>
                         <div className="md:col-span-2">
                             <label className="block text-xs font-bold mb-1">Categories (Check all that apply)</label>
                             <div className="flex flex-wrap gap-3 p-3 rounded bg-surface-container-low border border-outline-variant/30 max-h-32 overflow-y-auto">
@@ -1108,7 +1131,7 @@ export default function Admin({ user, menuItemsList, categoriesList, setMenuItem
                         <h3 className="font-bold text-sm">Sizes & Calorie Options</h3>
                         <label className="flex items-center gap-2">
                           <input type="checkbox" checked={editingItemShowOptions} onChange={e => setEditingItemShowOptions(e.target.checked)} className="rounded text-primary" />
-                          <span className="text-xs font-bold text-on-surface-variant">Enable 450 Cal / 700 Cal Options</span>
+                          <span className="text-xs font-bold text-on-surface-variant">Enable Multiple Size Options</span>
                         </label>
                       </div>
                       
@@ -1116,8 +1139,14 @@ export default function Admin({ user, menuItemsList, categoriesList, setMenuItem
                         <div className="space-y-4 mb-4">
                           <div className="flex gap-4">
                             <div className="flex-1">
-                              <label className="block text-xs font-bold mb-1">Price for 450 Cal</label>
-                              <input type="text" value={price450} onChange={e => setPrice450(e.target.value)} placeholder="e.g. $10.00" className="w-full p-2 rounded bg-surface-container-low border border-outline-variant/30 text-sm" />
+                              <label className="block text-xs font-bold mb-1">Calories (Regular)</label>
+                              <input type="text" value={editingItemCalories} onChange={e => setEditingItemCalories(e.target.value)} placeholder="e.g. 450" className="w-full p-2 rounded bg-surface-container-low border border-outline-variant/30 text-sm" />
+                            </div>
+                            <div className="flex-1 flex gap-2 items-end">
+                              <div className="flex-1">
+                                <label className="block text-xs font-bold mb-1">Price</label>
+                                <input type="text" value={price450} onChange={e => setPrice450(e.target.value)} placeholder="e.g. $10.00" className="w-full p-2 rounded bg-surface-container-low border border-outline-variant/30 text-sm" />
+                              </div>
                             </div>
                             <div className="flex-1 flex gap-2 items-end">
                                <input type="text" value={macros450.protein} onChange={e => setMacros450({...macros450, protein: e.target.value})} placeholder="Pro (g)" className="w-full p-2 rounded bg-surface-container-low border border-outline-variant/30 text-sm" />
@@ -1127,8 +1156,14 @@ export default function Admin({ user, menuItemsList, categoriesList, setMenuItem
                           </div>
                           <div className="flex gap-4">
                             <div className="flex-1">
-                              <label className="block text-xs font-bold mb-1">Price for 700 Cal</label>
-                              <input type="text" value={price700} onChange={e => setPrice700(e.target.value)} placeholder="e.g. $15.00" className="w-full p-2 rounded bg-surface-container-low border border-outline-variant/30 text-sm" />
+                              <label className="block text-xs font-bold mb-1">Calories (Large)</label>
+                              <input type="text" value={editingItemCaloriesLarge} onChange={e => setEditingItemCaloriesLarge(e.target.value)} placeholder="e.g. 700" className="w-full p-2 rounded bg-surface-container-low border border-outline-variant/30 text-sm" />
+                            </div>
+                            <div className="flex-1 flex gap-2 items-end">
+                              <div className="flex-1">
+                                <label className="block text-xs font-bold mb-1">Price</label>
+                                <input type="text" value={price700} onChange={e => setPrice700(e.target.value)} placeholder="e.g. $15.00" className="w-full p-2 rounded bg-surface-container-low border border-outline-variant/30 text-sm" />
+                              </div>
                             </div>
                             <div className="flex-1 flex gap-2 items-end">
                                <input type="text" value={macros700.protein} onChange={e => setMacros700({...macros700, protein: e.target.value})} placeholder="Pro (g)" className="w-full p-2 rounded bg-surface-container-low border border-outline-variant/30 text-sm" />
