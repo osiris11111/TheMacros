@@ -425,6 +425,7 @@ function Menu({ setView, cartItems, setCartItems, isAdmin, isBagOpen, setIsBagOp
                   setFriesSelection('None');
                   setSoftDrinksSelection({});
                   if (predefinedSize) setSizeSelection(predefinedSize);
+                  else if (selectedItem.sizes && selectedItem.sizes.length === 1) setSizeSelection(selectedItem.sizes[0].label);
                   else setSizeSelection('');
                 }}
               />
@@ -468,19 +469,23 @@ function Menu({ setView, cartItems, setCartItems, isAdmin, isBagOpen, setIsBagOp
 
                             {modalItem.sizes && modalItem.sizes.length > 0 && (
                               <div className="mb-6">
-                                <label className="block text-sm font-bold mb-2">Select Size</label>
-                                <div className="grid grid-cols-2 gap-3">
-                                  {modalItem.sizes.map(size => (
-                                    <button 
-                                      key={size.label}
-                                      onClick={() => setSizeSelection(size.label)}
-                                      className={`p-3 rounded-xl border text-left flex justify-between items-center ${sizeSelection === size.label ? 'border-primary bg-primary/10' : 'border-outline-variant/30 bg-surface-container-low'}`}
-                                    >
-                                      <span className="font-bold text-sm">{size.label}</span>
-                                      <span className="text-xs text-on-surface-variant">{size.price}</span>
-                                    </button>
-                                  ))}
-                                </div>
+                                {modalItem.sizes.length > 1 && (
+                                  <>
+                                    <label className="block text-sm font-bold mb-2">Select Size</label>
+                                    <div className="grid grid-cols-2 gap-3 mb-4">
+                                      {modalItem.sizes.map((size: any) => (
+                                        <button 
+                                          key={size.label}
+                                          onClick={() => setSizeSelection(size.label)}
+                                          className={`p-3 rounded-xl border text-left flex justify-between items-center ${sizeSelection === size.label ? 'border-primary bg-primary/10' : 'border-outline-variant/30 bg-surface-container-low'}`}
+                                        >
+                                          <span className="font-bold text-sm">{size.label}</span>
+                                          <span className="text-xs text-on-surface-variant">{size.price}</span>
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </>
+                                )}
                                 {sizeSelection && (() => {
                                   const selectedSizeObj = modalItem.sizes.find(s => s.label === sizeSelection);
                                   if (selectedSizeObj && (selectedSizeObj.protein || selectedSizeObj.carbs || selectedSizeObj.fats)) {
