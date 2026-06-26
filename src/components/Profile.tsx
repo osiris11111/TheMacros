@@ -34,47 +34,82 @@ export default function Profile({ user, setView, favorites, menuItemsList, setCa
   const favoriteItems = menuItemsList.filter(item => favorites.includes(item.id));
 
   useEffect(() => {
-    let q;
     if (user) {
-      q = query(collection(db, 'orders'), where('userId', '==', user.uid));
+      const q = query(collection(db, 'orders'), where('userId', '==', user.uid));
+      const unsub = onSnapshot(q, (snap) => {
+        const newOrders = snap.docs.map(d => d.data()).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        
+        setOrders(prev => {
+          if (prev.length > 0) {
+            newOrders.forEach(newOrder => {
+              const oldOrder = prev.find(o => o.id === newOrder.id);
+              if (oldOrder && oldOrder.status !== newOrder.status) {
+                const msg = `Order ${newOrder.id} is now ${newOrder.status.toUpperCase()}`;
+                const notifId = Date.now() + Math.random();
+                setNotifications(n => [...n, { id: notifId, message: msg }]);
+                
+                if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+                  try {
+                    new Notification('Order Status Update', { body: msg });
+                  } catch (e) {
+                    console.log('Notification API error:', e);
+                  }
+                }
+
+                setTimeout(() => {
+                  setNotifications(n => n.filter(notif => notif.id !== notifId));
+                }, 5000);
+              }
+            });
+          }
+          return newOrders;
+        });
+      }, (error) => handleFirestoreError(error, OperationType.LIST, 'orders'));
+      return () => unsub();
     } else {
       const guestId = localStorage.getItem('guestId');
-      if (guestId) {
-        q = query(collection(db, 'orders'), where('guestId', '==', guestId));
-      } else {
-        return;
+      const guestOrdersStr = localStorage.getItem('guestOrders');
+      const guestOrders = guestOrdersStr ? JSON.parse(guestOrdersStr) : [];
+      
+      if (guestId && guestOrders.length > 0) {
+        const unsubs = guestOrders.map((orderId: string) => {
+          return onSnapshot(doc(db, 'orders', orderId), (docSnap) => {
+            if (docSnap.exists() && docSnap.data().guestId === guestId) {
+              const updatedOrder = docSnap.data();
+              
+              setOrders(prev => {
+                const existing = prev.find(o => o.id === updatedOrder.id);
+                const newOrders = prev.filter(o => o.id !== updatedOrder.id);
+                newOrders.push(updatedOrder);
+                newOrders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+                
+                if (existing && existing.status !== updatedOrder.status) {
+                  const msg = `Order ${updatedOrder.id} is now ${updatedOrder.status.toUpperCase()}`;
+                  const notifId = Date.now() + Math.random();
+                  setNotifications(n => [...n, { id: notifId, message: msg }]);
+                  
+                  if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+                    try {
+                      new Notification('Order Status Update', { body: msg });
+                    } catch (e) {
+                      console.log('Notification API error:', e);
+                    }
+                  }
+
+                  setTimeout(() => {
+                    setNotifications(n => n.filter(notif => notif.id !== notifId));
+                  }, 5000);
+                }
+                return newOrders;
+              });
+            }
+          }, (error) => {
+             // Ignoring individual not-found errors for guests to avoid UI popups
+          });
+        });
+        return () => unsubs.forEach(unsub => unsub());
       }
     }
-    const unsub = onSnapshot(q, (snap) => {
-      const newOrders = snap.docs.map(d => d.data()).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-      
-      setOrders(prev => {
-        if (prev.length > 0) {
-          newOrders.forEach(newOrder => {
-            const oldOrder = prev.find(o => o.id === newOrder.id);
-            if (oldOrder && oldOrder.status !== newOrder.status) {
-              const msg = `Order ${newOrder.id} is now ${newOrder.status.toUpperCase()}`;
-              const notifId = Date.now() + Math.random();
-              setNotifications(n => [...n, { id: notifId, message: msg }]);
-              
-              if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-                try {
-                  new Notification('Order Status Update', { body: msg });
-                } catch (e) {
-                  console.log('Notification API error:', e);
-                }
-              }
-
-              setTimeout(() => {
-                setNotifications(n => n.filter(notif => notif.id !== notifId));
-              }, 5000);
-            }
-          });
-        }
-        return newOrders;
-      });
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'orders'));
-    return () => unsub();
   }, [user]);
 
   const handleSignIn = async () => {

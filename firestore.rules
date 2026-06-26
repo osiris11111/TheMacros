@@ -148,8 +148,9 @@ service cloud.firestore {
     }
 
     match /orders/{orderId} {
-      // Owner can fetch their order, admin can fetch and list all. 
-      allow get: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
+      // Guests can read an order if they know the exact unguessable ID. 
+      allow get: if true;
+      // Only authenticated users and admins can list/query orders.
       allow list: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
       
       // Anyone can create an order (including guests). If authenticated, userId must match.

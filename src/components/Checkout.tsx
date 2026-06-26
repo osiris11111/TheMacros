@@ -214,6 +214,15 @@ export default function Checkout({ setView, cartItems, setCartItems, user, isBag
     try {
       await setDoc(doc(db, 'orders', orderData.id), orderData);
 
+      // Save order ID to localStorage for guest tracking
+      if (!user) {
+        const guestOrders = JSON.parse(localStorage.getItem('guestOrders') || '[]');
+        if (!guestOrders.includes(orderData.id)) {
+          guestOrders.push(orderData.id);
+          localStorage.setItem('guestOrders', JSON.stringify(guestOrders));
+        }
+      }
+
       setCartItems([]);
       setView('profile'); // Redirect to profile/orders
       
