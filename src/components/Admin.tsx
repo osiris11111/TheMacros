@@ -436,7 +436,7 @@ export default function Admin({ user, menuItemsList, categoriesList, setMenuItem
     }
   };
 
-  const exportSalesData = () => {
+  const exportSalesData = async () => {
     if (!exportStartDate || !exportEndDate) {
       alert('Please select both start and end dates.');
       return;
@@ -446,36 +446,46 @@ export default function Admin({ user, menuItemsList, categoriesList, setMenuItem
     const end = new Date(exportEndDate);
     end.setHours(23, 59, 59, 999);
 
-    const completedOrders = orders.filter(o => 
-      o.status === 'completed' && 
-      new Date(o.createdAt) >= start && 
-      new Date(o.createdAt) <= end
-    );
+    try {
+      const ordersRef = collection(db, 'orders');
+      const q = query(
+        ordersRef,
+        where('createdAt', '>=', start.toISOString()),
+        where('createdAt', '<=', end.toISOString())
+      );
+      const snapshot = await getDocs(q);
+      const fetchedOrders = snapshot.docs.map(doc => doc.data() as any);
 
-    if (completedOrders.length === 0) {
-      alert('No completed orders found in this date range.');
-      return;
+      const completedOrders = fetchedOrders.filter(o => o.status === 'completed' && !o.isDeleted);
+
+      if (completedOrders.length === 0) {
+        alert('No completed orders found in this date range.');
+        return;
+      }
+
+      const headers = ['Order ID', 'Date', 'Customer Name', 'Total Amount', 'Items'];
+      const csvRows = [headers.join(',')];
+
+      completedOrders.forEach(o => {
+        const date = new Date(o.createdAt).toLocaleString().replace(/,/g, '');
+        const name = o.deliveryDetails?.name?.replace(/,/g, ' ') || 'Unknown';
+        const total = o.total;
+        const items = o.items.map((i: any) => `${i.qty}x ${i.title}`).join('; ');
+        csvRows.push(`${o.id},${date},${name},${total},"${items}"`);
+      });
+
+      const csvString = csvRows.join('\n');
+      const blob = new Blob([csvString], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.setAttribute('href', url);
+      a.setAttribute('download', `sales_export_${exportStartDate}_to_${exportEndDate}.csv`);
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error exporting sales data:', error);
+      alert('Failed to export sales data.');
     }
-
-    const headers = ['Order ID', 'Date', 'Customer Name', 'Total Amount', 'Items'];
-    const csvRows = [headers.join(',')];
-
-    completedOrders.forEach(o => {
-      const date = new Date(o.createdAt).toLocaleString().replace(/,/g, '');
-      const name = o.deliveryDetails?.name?.replace(/,/g, ' ') || 'Unknown';
-      const total = o.total;
-      const items = o.items.map((i: any) => `${i.qty}x ${i.title}`).join('; ');
-      csvRows.push(`${o.id},${date},${name},${total},"${items}"`);
-    });
-
-    const csvString = csvRows.join('\n');
-    const blob = new Blob([csvString], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.setAttribute('href', url);
-    a.setAttribute('download', `sales_export_${exportStartDate}_to_${exportEndDate}.csv`);
-    a.click();
-    URL.revokeObjectURL(url);
   };
 
   const optimizeImages = async () => {
@@ -960,9 +970,9 @@ export default function Admin({ user, menuItemsList, categoriesList, setMenuItem
           <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-6 gap-4">
             <h2 className="text-xl font-bold">Business Dashboard</h2>
             <div className="flex gap-2 items-center flex-wrap">
-              <input type="date" value={exportStartDate} onChange={e => setExportStartDate(e.target.value)} className="p-2 rounded bg-surface border border-outline-variant/30 text-sm" />
+              <input type="date" value={exportStartDate} onChange={e => setExportStartDate(e.target.value)} className="p-2 rounded bg-surface border border-outline-variant/30 text-sm text-on-surface dark:text-white" />
               <span className="text-on-surface-variant">to</span>
-              <input type="date" value={exportEndDate} onChange={e => setExportEndDate(e.target.value)} className="p-2 rounded bg-surface border border-outline-variant/30 text-sm" />
+              <input type="date" value={exportEndDate} onChange={e => setExportEndDate(e.target.value)} className="p-2 rounded bg-surface border border-outline-variant/30 text-sm text-on-surface dark:text-white" />
               <button onClick={exportSalesData} className="bg-primary text-on-primary px-4 py-2 rounded font-bold text-sm">Export Sales Data</button>
               <button onClick={optimizeImages} className="bg-secondary text-on-secondary px-4 py-2 rounded font-bold text-sm">Optimize Images</button>
             </div>
