@@ -852,7 +852,9 @@ function AppContent() {
                     'mapu tofu noodles',
                     'the lean kabab wrape',
                     'the tahini shawerma wrap',
-                    'the loaded chicken shawerma wrap'
+                    'the loaded chicken shawerma wrap',
+                    'honey garlic salmon',
+                    'turkey & cheese sandwich'
                 ]);
                 items = items.filter(item => {
                     if (!item.title) return false;

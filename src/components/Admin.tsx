@@ -1086,17 +1086,17 @@ export default function Admin({ user, menuItemsList, categoriesList, setMenuItem
                             </label>
                         </div>
                         <div className="md:col-span-2">
-                            <label className="block text-xs font-bold mb-1">Categories (Check all that apply)</label>
+                            <label className="block text-xs font-bold mb-1">Category</label>
                             <div className="flex flex-wrap gap-3 p-3 rounded bg-surface-container-low border border-outline-variant/30 max-h-32 overflow-y-auto">
                                 {categoriesList.map(cat => (
                                   <label key={cat.id} className="flex items-center gap-2 cursor-pointer text-sm">
                                     <input 
-                                      type="checkbox"
-                                      className="rounded text-primary"
+                                      type="radio"
+                                      name="category_selection"
+                                      className="text-primary"
                                       checked={editingItemCategories.includes(cat.name)}
                                       onChange={(e) => {
-                                        if (e.target.checked) setEditingItemCategories([...editingItemCategories, cat.name]);
-                                        else setEditingItemCategories(editingItemCategories.filter(c => c !== cat.name));
+                                        if (e.target.checked) setEditingItemCategories([cat.name]);
                                       }}
                                     />
                                     <span>{cat.name.charAt(0).toUpperCase() + cat.name.slice(1)}</span>

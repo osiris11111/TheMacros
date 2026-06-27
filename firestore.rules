@@ -158,14 +158,15 @@ service cloud.firestore {
                     (!('userId' in request.resource.data) || request.resource.data.userId == null ||
                      (isAuthenticated() && request.resource.data.userId == request.auth.uid));
                      
-      // Only admins can update orders (e.g., change status), OR users can cancel their own orders
-      allow update: if isValidOrder() && (
-                      isAdmin() || 
-                      (isAuthenticated() && 
-                       resource.data.userId == request.auth.uid && 
+      // Only admins can update orders (e.g., change status), OR users/guests can cancel their own orders
+      allow update: if (isAdmin() && isValidOrder()) || (
                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']) &&
                        request.resource.data.status == 'cancelled' &&
-                       resource.data.status in ['pending', 'preparing'])
+                       resource.data.status in ['pending', 'preparing'] &&
+                       (
+                         (isAuthenticated() && resource.data.get('userId', null) == request.auth.uid) ||
+                         (resource.data.get('userId', null) == null)
+                       )
                     );
       allow delete: if isAdmin();
     }
