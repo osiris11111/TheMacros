@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { auth, db, googleProvider, messaging } from './firebase';
 import { signInWithPopup, signOut, onAuthStateChanged, User } from 'firebase/auth';
-import { collection, addDoc, getDocs, query, where, onSnapshot, doc, setDoc, updateDoc, getDoc, deleteDoc, orderBy, limit } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query, where, onSnapshot, doc, setDoc, updateDoc, getDoc, deleteDoc, orderBy, limit, arrayUnion } from 'firebase/firestore';
 import { getToken, onMessage } from 'firebase/messaging';
 import { LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
@@ -200,12 +200,13 @@ function MenuCardItem({ item, idx, favorites, toggleFavorite, onSelect, menuItem
   );
 }
 
-function Menu({ setView, cartItems, setCartItems, isAdmin, isBagOpen, setIsBagOpen, menuItemsList, categoriesList, user, favorites, isLoading }: { setView: (v: string) => void, cartItems: CartItem[], setCartItems: React.Dispatch<React.SetStateAction<CartItem[]>>, isAdmin: boolean, isBagOpen: boolean, setIsBagOpen: (v: boolean) => void, menuItemsList: MenuItem[], categoriesList: MenuCategory[], user: User | null, favorites: string[], isLoading?: boolean }) {
+function Menu({ setView, cartItems, setCartItems, isAdmin, isBagOpen, setIsBagOpen, menuItemsList, categoriesList, user, favorites, isLoading, retryFetch }: { setView: (v: string) => void, cartItems: CartItem[], setCartItems: React.Dispatch<React.SetStateAction<CartItem[]>>, isAdmin: boolean, isBagOpen: boolean, setIsBagOpen: (v: boolean) => void, menuItemsList: MenuItem[], categoriesList: MenuCategory[], user: User | null, favorites: string[], isLoading?: boolean, retryFetch?: () => void }) {
   const [modalItem, setModalItem] = useState<MenuItem | null>(null);
   const [modalStep, setModalStep] = useState<1 | 2>(1);
   const [specialInstructions, setSpecialInstructions] = useState('');
   const [activeCategory, setActiveCategory] = useState<string>('');
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [pendingFavorite, setPendingFavorite] = useState<string | null>(null);
   
   // Add-ons state
   const [quantity, setQuantity] = useState<number>(1);
@@ -217,6 +218,7 @@ function Menu({ setView, cartItems, setCartItems, isAdmin, isBagOpen, setIsBagOp
   const toggleFavorite = async (e: React.MouseEvent, itemId: string) => {
     e.stopPropagation();
     if (!user) {
+      setPendingFavorite(itemId);
       setShowLoginModal(true);
       return;
     }
@@ -435,7 +437,17 @@ function Menu({ setView, cartItems, setCartItems, isAdmin, isBagOpen, setIsBagOp
         </section>
       )}
       {!isLoading && (!activeCategory || !menuItems[activeCategory] || menuItems[activeCategory].length === 0) && (
-        <p className="text-on-surface-variant text-center">No items available in this category.</p>
+        <div className="flex flex-col items-center">
+          <p className="text-on-surface-variant text-center">No items available in this category.</p>
+          {retryFetch && (
+            <button 
+              onClick={retryFetch}
+              className="bg-primary text-on-primary px-6 py-2 rounded-full font-bold text-sm mt-4 transition-colors hover:bg-primary/90"
+            >
+              Retry
+            </button>
+          )}
+        </div>
       )}
 
       {modalItem && (
@@ -717,9 +729,9 @@ function Menu({ setView, cartItems, setCartItems, isAdmin, isBagOpen, setIsBagOp
       </div>
 
       {showLoginModal && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowLoginModal(false)}>
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => { setShowLoginModal(false); setPendingFavorite(null); }}>
           <div className="bg-surface rounded-2xl p-8 max-w-sm w-full mx-4 shadow-2xl relative text-center" onClick={e => e.stopPropagation()}>
-            <button className="absolute top-4 right-4 z-[50] text-on-surface-variant hover:text-on-surface" onClick={() => setShowLoginModal(false)}>
+            <button className="absolute top-4 right-4 z-[50] text-on-surface-variant hover:text-on-surface" onClick={() => { setShowLoginModal(false); setPendingFavorite(null); }}>
                 <span className="material-symbols-outlined">close</span>
             </button>
             <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4 text-primary">
@@ -730,8 +742,26 @@ function Menu({ setView, cartItems, setCartItems, isAdmin, isBagOpen, setIsBagOp
             <button 
               onClick={async () => {
                 try {
-                  await signInWithPopup(auth, googleProvider);
+                  const credential = await signInWithPopup(auth, googleProvider);
                   setShowLoginModal(false);
+                  
+                  const userRef = doc(db, 'users', credential.user.uid);
+                  const userSnap = await getDoc(userRef);
+                  
+                  if (!userSnap.exists()) {
+                    await setDoc(userRef, {
+                      uid: credential.user.uid,
+                      email: credential.user.email,
+                      name: credential.user.displayName,
+                      role: 'customer',
+                      createdAt: new Date().toISOString(),
+                      favorites: pendingFavorite ? [pendingFavorite] : []
+                    });
+                    setPendingFavorite(null);
+                  } else if (pendingFavorite) {
+                    await setDoc(userRef, { favorites: arrayUnion(pendingFavorite) }, { merge: true });
+                    setPendingFavorite(null);
+                  }
                 } catch (error) {
                   console.error("Login failed", error);
                 }
@@ -838,72 +868,71 @@ function AppContent() {
     }
   }, []);
 
+  const fetchMenuAndCategories = React.useCallback(async () => {
+      setIsLoadingMenu(true);
+      const cachedCats = sessionStorage.getItem('cats_session_cache');
+      const cachedItems = sessionStorage.getItem('items_session_cache');
+
+      let currentCats: MenuCategory[] = [];
+      let currentItems: MenuItem[] = [];
+
+      try {
+          if (cachedCats) {
+              currentCats = JSON.parse(cachedCats);
+              if (!currentCats.some((c: any) => c.name.toLowerCase() === 'others')) {
+                  currentCats.push({ id: 'cat-others', name: 'Others', order: 999 } as any);
+              }
+              setCategories(currentCats);
+          } else {
+              const catsSnap = await getDocs(collection(db, 'menuCategories'));
+              currentCats = catsSnap.docs.map(d => ({id: d.id, ...d.data()} as MenuCategory)).sort((a, b) => a.order - b.order);
+              if (!currentCats.some(c => c.name.toLowerCase() === 'others')) {
+                  currentCats.push({ id: 'cat-others', name: 'Others', order: 999 } as any);
+              }
+              setCategories(currentCats);
+              sessionStorage.setItem('cats_session_cache', JSON.stringify(currentCats));
+          }
+
+          if (cachedItems) {
+              currentItems = JSON.parse(cachedItems);
+              setMenuItems(currentItems);
+          } else {
+              const itemsSnap = await getDocs(collection(db, 'menuItems'));
+              let items = itemsSnap.docs.map(d => ({id: d.id, ...d.data()} as MenuItem));
+              
+              const seen = new Set();
+              const legacyTitles = new Set([
+                  'the feiesta bowl',
+                  'mapu tofu noodles',
+                  'the lean kabab wrape',
+                  'the tahini shawerma wrap',
+                  'the loaded chicken shawerma wrap',
+                  'honey garlic salmon',
+                  'turkey & cheese sandwich'
+              ]);
+              items = items.filter(item => {
+                  if (!item.title) return false;
+                  const titleLower = item.title.toLowerCase().trim();
+                  if (legacyTitles.has(titleLower)) return false;
+                  if (seen.has(titleLower)) return false;
+                  seen.add(titleLower);
+                  return true;
+              });
+              currentItems = items;
+              setMenuItems(currentItems);
+              sessionStorage.setItem('items_session_cache', JSON.stringify(currentItems));
+          }
+      } catch(error) {
+          handleFirestoreError(error, OperationType.GET, 'menu');
+      } finally {
+          setIsLoadingMenu(false);
+      }
+  }, []);
+
   useEffect(() => {
-    const fetchMenuAndCategories = async () => {
-        setIsLoadingMenu(true);
-        const cachedCats = sessionStorage.getItem('cats_session_cache');
-        const cachedItems = sessionStorage.getItem('items_session_cache');
-
-        let currentCats: MenuCategory[] = [];
-        let currentItems: MenuItem[] = [];
-
-        try {
-            if (cachedCats) {
-                currentCats = JSON.parse(cachedCats);
-                if (!currentCats.some(c => c.name.toLowerCase() === 'others')) {
-                    currentCats.push({ id: 'cat-others', name: 'Others', order: 999 });
-                }
-                setCategories(currentCats);
-            } else {
-                const catsSnap = await getDocs(collection(db, 'menuCategories'));
-                currentCats = catsSnap.docs.map(d => ({id: d.id, ...d.data()} as MenuCategory)).sort((a, b) => a.order - b.order);
-                if (!currentCats.some(c => c.name.toLowerCase() === 'others')) {
-                    currentCats.push({ id: 'cat-others', name: 'Others', order: 999 });
-                }
-                setCategories(currentCats);
-                sessionStorage.setItem('cats_session_cache', JSON.stringify(currentCats));
-            }
-
-            if (cachedItems) {
-                currentItems = JSON.parse(cachedItems);
-                setMenuItems(currentItems);
-            } else {
-                const itemsSnap = await getDocs(collection(db, 'menuItems'));
-                let items = itemsSnap.docs.map(d => ({id: d.id, ...d.data()} as MenuItem));
-                
-                const seen = new Set();
-                const legacyTitles = new Set([
-                    'the feiesta bowl',
-                    'mapu tofu noodles',
-                    'the lean kabab wrape',
-                    'the tahini shawerma wrap',
-                    'the loaded chicken shawerma wrap',
-                    'honey garlic salmon',
-                    'turkey & cheese sandwich'
-                ]);
-                items = items.filter(item => {
-                    if (!item.title) return false;
-                    const titleLower = item.title.toLowerCase().trim();
-                    if (legacyTitles.has(titleLower)) return false;
-                    if (seen.has(titleLower)) return false;
-                    seen.add(titleLower);
-                    return true;
-                });
-                currentItems = items;
-                setMenuItems(currentItems);
-                sessionStorage.setItem('items_session_cache', JSON.stringify(currentItems));
-            }
-        } catch(error) {
-            handleFirestoreError(error, OperationType.GET, 'menu');
-        } finally {
-            setIsLoadingMenu(false);
-        }
-    };
-
     fetchMenuAndCategories();
 
     let unsubUser: (() => void) | undefined;
-
 
     const unsubAuth = onAuthStateChanged(auth, async (u) => {
       setUser(u);
@@ -941,6 +970,16 @@ function AppContent() {
     return () => { unsubAuth(); if (unsubUser) unsubUser(); };
   }, []);
 
+  useEffect(() => {
+    const handleOnline = () => {
+      if (menuItems.length === 0) {
+        fetchMenuAndCategories();
+      }
+    };
+    window.addEventListener('online', handleOnline);
+    return () => window.removeEventListener('online', handleOnline);
+  }, [fetchMenuAndCategories, menuItems.length]);
+
   return (
     <ErrorBoundary>
       <div className="min-h-screen flex flex-col bg-surface text-on-surface">
@@ -950,7 +989,7 @@ function AppContent() {
         <div className="flex-grow">
           <Routes>
             <Route path="/" element={<Home setView={setView} />} />
-            <Route path="/menu" element={<Menu setView={setView} cartItems={cartItems} setCartItems={setCartItems} isAdmin={isAdmin} isBagOpen={isBagOpen} setIsBagOpen={setIsBagOpen} menuItemsList={menuItems} categoriesList={categories} user={user} favorites={favorites} isLoading={isLoadingMenu} />} />
+            <Route path="/menu" element={<Menu setView={setView} cartItems={cartItems} setCartItems={setCartItems} isAdmin={isAdmin} isBagOpen={isBagOpen} setIsBagOpen={setIsBagOpen} menuItemsList={menuItems} categoriesList={categories} user={user} favorites={favorites} isLoading={isLoadingMenu} retryFetch={fetchMenuAndCategories} />} />
             <Route path="/packages" element={<Packages setView={setView} cartItems={cartItems} setCartItems={setCartItems} isBagOpen={isBagOpen} setIsBagOpen={setIsBagOpen} menuItemsList={menuItems} isLoading={isLoadingMenu} />} />
             <Route path="/checkout" element={<Checkout setView={setView} cartItems={cartItems} setCartItems={setCartItems} user={user} isBagOpen={isBagOpen} setIsBagOpen={setIsBagOpen} />} />
             <Route path="/profile" element={<Profile user={user} setView={setView} favorites={favorites} menuItemsList={menuItems} setCartItems={setCartItems} />} />
