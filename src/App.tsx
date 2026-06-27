@@ -223,9 +223,9 @@ function Menu({ setView, cartItems, setCartItems, isAdmin, isBagOpen, setIsBagOp
     try {
       const userRef = doc(db, 'users', user.uid);
       if (favorites.includes(itemId)) {
-        await updateDoc(userRef, { favorites: favorites.filter(id => id !== itemId) });
+        await setDoc(userRef, { favorites: favorites.filter(id => id !== itemId) }, { merge: true });
       } else {
-        await updateDoc(userRef, { favorites: [...favorites, itemId] });
+        await setDoc(userRef, { favorites: [...favorites, itemId] }, { merge: true });
       }
     } catch (error) {
       console.error("Error updating favorites", error);
