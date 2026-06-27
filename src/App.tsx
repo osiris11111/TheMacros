@@ -205,6 +205,7 @@ function Menu({ setView, cartItems, setCartItems, isAdmin, isBagOpen, setIsBagOp
   const [modalStep, setModalStep] = useState<1 | 2>(1);
   const [specialInstructions, setSpecialInstructions] = useState('');
   const [activeCategory, setActiveCategory] = useState<string>('');
+  const [showLoginModal, setShowLoginModal] = useState(false);
   
   // Add-ons state
   const [quantity, setQuantity] = useState<number>(1);
@@ -216,7 +217,7 @@ function Menu({ setView, cartItems, setCartItems, isAdmin, isBagOpen, setIsBagOp
   const toggleFavorite = async (e: React.MouseEvent, itemId: string) => {
     e.stopPropagation();
     if (!user) {
-      alert("Please sign in to save favorites.");
+      setShowLoginModal(true);
       return;
     }
     try {
@@ -455,15 +456,11 @@ function Menu({ setView, cartItems, setCartItems, isAdmin, isBagOpen, setIsBagOp
                             <p className="text-on-surface-variant text-sm mb-6">{modalItem.desc}</p>
                             
                             <div className="bg-surface-container-low rounded-xl p-4 mb-6 space-y-3 text-sm">
-                                <div className="flex justify-between border-b border-outline-variant/20 pb-2">
+                                <div className="flex justify-between pb-2">
                                     <span className="font-bold text-on-surface">Prep Time</span>
-                                    <span className="text-on-surface-variant">{modalItem.prepTime || '15 mins'}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span className="font-bold text-on-surface">
-                                      {(modalItem.categories?.includes('COMBOS') || modalItem.category === 'COMBOS' || modalItem.categories?.includes('combos')) ? 'Items' : 'Ingredients'}
+                                    <span className="text-on-surface-variant">
+                                      {modalItem.category === 'PACKAGES' || modalItem.categories?.includes('PACKAGES') ? (modalItem.prepTime || '15 mins') : '(≈ 45 mins)'}
                                     </span>
-                                    <span className="text-on-surface-variant text-right max-w-[60%]">{modalItem.ingredients || 'Secret recipe'}</span>
                                 </div>
                             </div>
 
@@ -718,6 +715,34 @@ function Menu({ setView, cartItems, setCartItems, isAdmin, isBagOpen, setIsBagOp
         </div>
       )}
       </div>
+
+      {showLoginModal && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowLoginModal(false)}>
+          <div className="bg-surface rounded-2xl p-8 max-w-sm w-full mx-4 shadow-2xl relative text-center" onClick={e => e.stopPropagation()}>
+            <button className="absolute top-4 right-4 z-[50] text-on-surface-variant hover:text-on-surface" onClick={() => setShowLoginModal(false)}>
+                <span className="material-symbols-outlined">close</span>
+            </button>
+            <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4 text-primary">
+              <span className="material-symbols-outlined text-3xl">favorite</span>
+            </div>
+            <h2 className="text-xl font-bold mb-2">Save your favorites</h2>
+            <p className="text-on-surface-variant text-sm mb-8">Sign in to save this item for later.</p>
+            <button 
+              onClick={async () => {
+                try {
+                  await signInWithPopup(auth, googleProvider);
+                  setShowLoginModal(false);
+                } catch (error) {
+                  console.error("Login failed", error);
+                }
+              }} 
+              className="bg-primary text-on-primary font-bold py-3 px-6 rounded-xl w-full flex items-center justify-center gap-2"
+            >
+              Continue with Google
+            </button>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

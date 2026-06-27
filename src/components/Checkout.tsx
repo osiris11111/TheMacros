@@ -327,7 +327,7 @@ export default function Checkout({ setView, cartItems, setCartItems, user, isBag
             {paymentMethod === 'omt' && (
               <div className="bg-secondary/10 text-secondary-dark p-4 rounded-xl text-sm leading-relaxed mt-4">
                 <p className="font-bold mb-2">Instructions for Whish Payment:</p>
-                <p>Please send the total amount to <strong>70 797 174</strong>.</p>
+                <p>Please send the total amount to <strong>71 122 883</strong>.</p>
                 <p className="mt-1"><strong>Important:</strong> Include your full name or email address in the transfer message so we can identify your payment.</p>
                 <p className="mt-2">After completing the transfer, click <strong>Place Order</strong> below. Please allow up to 5 minutes for us to verify the receipt. Once confirmed, we will begin preparing your order immediately!</p>
               </div>
