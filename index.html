@@ -24,6 +24,20 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&family=Shrikhand&display=swap" rel="stylesheet"/>
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=block" rel="stylesheet"/>
+    <style>
+      .material-symbols-outlined {
+        color: transparent;
+        transition: color 0.2s ease;
+      }
+      .icons-loaded .material-symbols-outlined {
+        color: inherit;
+      }
+    </style>
+    <script>
+      document.fonts.load('10px "Material Symbols Outlined"').then(() => {
+        document.body.classList.add('icons-loaded');
+      });
+    </script>
   </head>
   <body>
     <div id="root"></div>
