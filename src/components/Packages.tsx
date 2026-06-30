@@ -73,7 +73,7 @@ export default function Packages({ setView, cartItems, setCartItems, isBagOpen, 
             ))
           ) : packages.map((item: any, idx: number) => (
             <div key={item.id || idx} className="flex gap-4 bg-surface-container-low p-4 rounded-xl transition relative cursor-pointer hover:bg-surface-container-high" onClick={() => setModalItem(item)}>
-              <CachedImage loading="lazy" src={item.img || 'https://via.placeholder.com/150'} alt={item.title} className="w-24 h-24 rounded-lg object-cover shadow-sm bg-surface" />
+              <CachedImage loading="eager" src={item.img || 'https://via.placeholder.com/150'} alt={item.title} className="w-24 h-24 rounded-lg object-cover shadow-sm bg-surface" />
               <div className="flex flex-col flex-1">
                 <h3 className="font-bold text-base text-on-surface leading-tight mb-1">{item.title}</h3>
                 <p className="text-xs text-on-surface-variant line-clamp-2 md:line-clamp-3 mb-2 flex-grow min-h-[2.5rem]">{item.desc}</p>

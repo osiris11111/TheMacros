@@ -127,9 +127,8 @@ function Home({ setView }: { setView: (view: string) => void }) {
                 Contact Us
               </a>
             </div>
-            <button onClick={() => setView('packages')} className="bg-primary text-on-primary px-6 py-4 rounded-lg font-['Arial'] font-bold uppercase tracking-widest text-sm hover:bg-primary-container transition-colors w-full flex items-center justify-center gap-2">
+            <button onClick={() => setView('packages')} className="bg-primary text-on-primary px-6 py-4 rounded-lg font-['Arial'] font-bold uppercase tracking-widest text-sm hover:bg-primary-container transition-colors w-full flex items-center justify-center">
               Save Up to 30%
-              <span className="material-symbols-outlined text-[15px]" style={{ fontVariationSettings: "'wght' 700" }}>arrow_forward</span>
             </button>
           </div>
         </div>
@@ -157,7 +156,7 @@ function MenuCardItem({ item, idx, favorites, toggleFavorite, onSelect, menuItem
         }
       }}
     >
-      <CachedImage loading="lazy" src={item.img} alt={item.title} className="w-24 h-24 object-cover rounded-lg" />
+      <CachedImage loading={item.category?.toLowerCase() === 'combos' || item.categories?.includes('COMBOS') || item.categories?.includes('combos') ? 'eager' : 'lazy'} src={item.img} alt={item.title} className="w-24 h-24 object-cover rounded-lg" />
       <div className="flex flex-col flex-1">
         <div className="flex justify-between items-start">
           <h3 className="font-bold text-lg text-on-surface">{item.title}</h3>
