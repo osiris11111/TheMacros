@@ -111,7 +111,7 @@ function Home({ setView }: { setView: (view: string) => void }) {
     <main>
       <section className="relative min-h-screen flex flex-col items-center justify-start px-6 overflow-hidden pt-[240px] md:pt-[270px] lg:pt-[220px] pb-24">
         <div className="absolute inset-0 z-0 bg-surface-container">
-          <CachedImage loading="eager" alt="Background Mobile" className="block md:hidden w-full h-full object-cover object-center opacity-90" src="https://res.cloudinary.com/dapr6bwus/image/upload/f_auto,q_auto/v1782162101/backg_tarucf.png" />
+          <CachedImage loading="eager" alt="Background Mobile" className="block md:hidden w-full h-full object-cover object-center opacity-90" src="https://res.cloudinary.com/dapr6bwus/image/upload/f_auto,q_auto,w_600/v1783010198/macrosfactory_daqgcc.jpg" />
           <CachedImage loading="eager" alt="Background Desktop" className="hidden md:block w-full h-full object-cover object-center opacity-90" src="https://res.cloudinary.com/dapr6bwus/image/upload/f_auto,q_auto/v1782162142/background_jwlopw.png" />
         </div>
         <div className="relative z-10 w-full max-w-4xl mx-auto text-center flex flex-col items-center mt-12 md:mt-16 mb-16">
