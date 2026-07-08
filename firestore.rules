@@ -81,13 +81,16 @@ service cloud.firestore {
     }
 
     function isValidOrder() {
-      return hasOnlyAllowedFields(['id', 'userId', 'guestId', 'items', 'total', 'status', 'deliveryDetails', 'createdAt', 'cancellable', 'promoCode', 'discountAmount']) &&
-             hasRequiredFields(['id', 'items', 'total', 'status', 'deliveryDetails', 'createdAt']) &&
+      return hasRequiredFields(['id', 'items', 'total', 'status', 'deliveryDetails', 'createdAt']) &&
              request.resource.data.id is string &&
+             (!('userId' in request.resource.data) || request.resource.data.userId is string) &&
              (!('guestId' in request.resource.data) || request.resource.data.guestId is string) &&
              (!('cancellable' in request.resource.data) || request.resource.data.cancellable is bool) &&
              (!('promoCode' in request.resource.data) || request.resource.data.promoCode is string) &&
-             (!('discountAmount' in request.resource.data) || request.resource.data.discountAmount is string) &&
+             (!('discountAmount' in request.resource.data) || request.resource.data.discountAmount is string || request.resource.data.discountAmount is number) &&
+             (!('subtotal' in request.resource.data) || request.resource.data.subtotal is string || request.resource.data.subtotal is number) &&
+             (!('deliveryFee' in request.resource.data) || request.resource.data.deliveryFee is number || request.resource.data.deliveryFee is string) &&
+             (!('deliveryZoneName' in request.resource.data) || request.resource.data.deliveryZoneName is string) &&
              request.resource.data.items is list &&
              request.resource.data.items.size() > 0 && request.resource.data.items.size() < 100 &&
              request.resource.data.total is string &&
@@ -195,6 +198,10 @@ service cloud.firestore {
       allow get: if true;
       allow list: if isAdmin();
       allow create, update, delete: if isAdmin();
+    }
+    match /settings/{document=**} {
+      allow read: if true;
+      allow write: if isAdmin();
     }
   }
 }

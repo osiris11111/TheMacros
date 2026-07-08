@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, addDoc, getDocs, updateDoc, doc, deleteDoc, query, orderBy, limit, where, onSnapshot, setDoc } from 'firebase/firestore';
+import { collection, addDoc, getDocs, updateDoc, doc, deleteDoc, query, orderBy, limit, where, onSnapshot, setDoc, getDoc } from 'firebase/firestore';
 import { LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { User } from 'firebase/auth';
@@ -10,11 +10,12 @@ import { OperationType } from '../types';
 import { CachedImage } from '../App';
 
 export default function Admin({ user, menuItemsList, categoriesList, setMenuItems, setCategories }: { user: User | null, menuItemsList: MenuItem[], categoriesList: MenuCategory[], setMenuItems: React.Dispatch<React.SetStateAction<MenuItem[]>>, setCategories: React.Dispatch<React.SetStateAction<MenuCategory[]>> }) {
-  const [activeTab, setActiveTab] = useState<'orders' | 'menu' | 'packages' | 'categories' | 'reviews' | 'users' | 'promos' | 'analytics'>('orders');
+  const [activeTab, setActiveTab] = useState<'orders' | 'menu' | 'packages' | 'categories' | 'reviews' | 'users' | 'promos' | 'analytics' | 'delivery'>('orders');
   const [users, setUsers] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
   const [reviews, setReviews] = useState<any[]>([]);
   const [promos, setPromos] = useState<any[]>([]);
+  const [deliveryZones, setDeliveryZones] = useState<{id: string, name: string, price: number, description: string}[]>([]);
   
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const [editingItemSizes, setEditingItemSizes] = useState<{label: string, price: string, protein?: string, carbs?: string, fats?: string}[]>([]);
@@ -35,6 +36,7 @@ export default function Admin({ user, menuItemsList, categoriesList, setMenuItem
   const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null);
 
   const [editingCategory, setEditingCategory] = useState<MenuCategory | null>(null);
+  const [editingZone, setEditingZone] = useState<{id: string, name: string, price: number, description: string} | null>(null);
   const [newAdminEmail, setNewAdminEmail] = useState('');
   const [userSearch, setUserSearch] = useState('');
   const [orderSearch, setOrderSearch] = useState('');
@@ -140,6 +142,12 @@ export default function Admin({ user, menuItemsList, categoriesList, setMenuItem
             const promosSnap = await getDocs(collection(db, 'promos'));
             if (!isMounted) return;
             setPromos(promosSnap.docs.map(d => d.data()));
+
+            const deliverySnap = await getDoc(doc(db, 'settings', 'delivery'));
+            if (!isMounted) return;
+            if (deliverySnap.exists()) {
+                setDeliveryZones(deliverySnap.data().zones || []);
+            }
         } catch(error) {
             console.error("Error fetching admin data:", error);
         }
@@ -390,6 +398,42 @@ export default function Admin({ user, menuItemsList, categoriesList, setMenuItem
     }
   };
 
+  const saveZone = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const id = editingZone?.id || `ZONE-${Date.now()}`;
+    const newZone = {
+      id,
+      name: formData.get('name') as string,
+      price: Number(formData.get('price')),
+      description: formData.get('description') as string
+    };
+    
+    try {
+      const updatedZones = editingZone?.id 
+        ? deliveryZones.map(z => z.id === id ? newZone : z)
+        : [...deliveryZones, newZone];
+        
+      await setDoc(doc(db, 'settings', 'delivery'), { zones: updatedZones }, { merge: true });
+      setDeliveryZones(updatedZones);
+      setEditingZone(null);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, 'settings/delivery');
+    }
+  };
+
+  const deleteZone = async (id: string) => {
+    if (window.confirm('Are you sure you want to delete this zone?')) {
+      try {
+        const updatedZones = deliveryZones.filter(z => z.id !== id);
+        await setDoc(doc(db, 'settings', 'delivery'), { zones: updatedZones }, { merge: true });
+        setDeliveryZones(updatedZones);
+      } catch (error) {
+        handleFirestoreError(error, OperationType.DELETE, 'settings/delivery');
+      }
+    }
+  };
+
   const savePromo = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
@@ -544,6 +588,7 @@ export default function Admin({ user, menuItemsList, categoriesList, setMenuItem
     { id: 'packages', label: 'Packages' },
     { id: 'categories', label: 'Categories' },
     { id: 'promos', label: 'Promo Codes' },
+    { id: 'delivery', label: 'Delivery' },
     { id: 'reviews', label: 'Reviews' },
     { id: 'users', label: 'Users' }
   ];
@@ -652,6 +697,12 @@ export default function Admin({ user, menuItemsList, categoriesList, setMenuItem
                                     <div className="mb-1"><span className="font-semibold">Payment:</span> {o.deliveryDetails?.paymentMethod === 'omt' ? 'Whish' : o.deliveryDetails?.paymentMethod === 'pod' ? 'Pay on Delivery' : o.deliveryDetails?.paymentMethod || 'Pay on Delivery'}</div>
                                     {o.deliveryDetails?.locationLink && <div className="mb-1"><span className="font-semibold">Maps Link:</span> <a href={o.deliveryDetails.locationLink} target="_blank" rel="noreferrer" className="text-primary underline break-all">View Map</a></div>}
                                     {o.deliveryDetails?.instructions && <div className="italic mt-1 text-on-surface-variant">Note: "{o.deliveryDetails.instructions}"</div>}
+                                  </div>
+                                  <div className="pt-2 mt-2 border-t border-outline-variant/20">
+                                    <div className="flex justify-between mb-1"><span className="text-on-surface-variant">Subtotal:</span> <span>${o.subtotal || o.total}</span></div>
+                                    {o.discountAmount && <div className="flex justify-between mb-1 text-green-600"><span className="text-on-surface-variant">Discount:</span> <span>-${o.discountAmount}</span></div>}
+                                    {o.deliveryFee !== undefined && <div className="flex justify-between mb-1"><span className="text-on-surface-variant">Delivery Fee {o.deliveryZoneName ? `(${o.deliveryZoneName})` : ''}:</span> <span>${Number(o.deliveryFee).toFixed(2)}</span></div>}
+                                    <div className="flex justify-between font-bold text-sm mt-1 pt-1 border-t border-outline-variant/10"><span>Total:</span> <span className="text-primary">${o.total}</span></div>
                                   </div>
                                 </div>
                               )}
@@ -888,6 +939,38 @@ export default function Admin({ user, menuItemsList, categoriesList, setMenuItem
             </div>
           </section>
         </>
+      )}
+
+      {activeTab === 'delivery' && (
+        <section className="mb-12">
+          <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold">Delivery Zones</h2>
+              <button onClick={() => setEditingZone({} as any)} className="bg-primary text-on-primary px-4 py-2 rounded text-sm font-bold">Add Zone</button>
+          </div>
+          <div className="overflow-x-auto bg-surface-container-low rounded-xl">
+              <table className="w-full text-left text-sm">
+                  <thead className="bg-surface-container-high">
+                      <tr><th className="p-4">Name</th><th className="p-4">Price</th><th className="p-4">Description</th><th className="p-4">Action</th></tr>
+                  </thead>
+                  <tbody>
+                      {deliveryZones.map(zone => (
+                          <tr key={zone.id} className="border-b border-outline-variant/10">
+                              <td className="p-4 font-bold">{zone.name}</td>
+                              <td className="p-4">${zone.price.toFixed(2)}</td>
+                              <td className="p-4 text-on-surface-variant max-w-[200px] truncate">{zone.description}</td>
+                              <td className="p-4 flex gap-2">
+                                  <button onClick={() => setEditingZone(zone)} className="text-primary font-bold text-xs">Edit</button>
+                                  <button onClick={() => deleteZone(zone.id)} className="text-error font-bold text-xs">Delete</button>
+                              </td>
+                          </tr>
+                      ))}
+                      {deliveryZones.length === 0 && (
+                        <tr><td colSpan={4} className="p-4 text-center text-on-surface-variant">No delivery zones configured yet.</td></tr>
+                      )}
+                  </tbody>
+              </table>
+          </div>
+        </section>
       )}
 
       {activeTab === 'promos' && (
@@ -1286,6 +1369,36 @@ export default function Admin({ user, menuItemsList, categoriesList, setMenuItem
                     <div className="flex gap-4 mt-4">
                         {editingCategory.id && <button type="button" onClick={() => deleteCategory(editingCategory.id)} className="w-full bg-error text-on-error py-3 rounded-xl font-bold">Delete Category</button>}
                         <button type="submit" className="w-full bg-primary text-on-primary py-3 rounded-xl font-bold">Save Category</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+      )}
+
+      {editingZone && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div className="bg-surface w-full max-w-md rounded-2xl p-6 relative">
+                <button className="absolute top-4 right-4 text-on-surface-variant" onClick={() => setEditingZone(null)}>
+                    <span className="material-symbols-outlined">close</span>
+                </button>
+                <h2 className="font-headline text-2xl mb-6">{editingZone.id ? 'Edit Zone' : 'Add New Zone'}</h2>
+                
+                <form onSubmit={saveZone} className="space-y-4">
+                    <div>
+                        <label className="block text-xs font-bold mb-1">Name</label>
+                        <input name="name" defaultValue={editingZone.name} required className="w-full p-3 rounded bg-surface-container-low border border-outline-variant/30 text-sm" />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold mb-1">Price ($)</label>
+                        <input name="price" type="number" step="0.01" defaultValue={editingZone.price} required className="w-full p-3 rounded bg-surface-container-low border border-outline-variant/30 text-sm" />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold mb-1">Description</label>
+                        <input name="description" defaultValue={editingZone.description} placeholder="e.g. Delivers Tue/Thu/Sat" className="w-full p-3 rounded bg-surface-container-low border border-outline-variant/30 text-sm" />
+                    </div>
+                    <div className="flex gap-4 mt-4">
+                        {editingZone.id && <button type="button" onClick={() => deleteZone(editingZone.id)} className="w-full bg-error text-on-error py-3 rounded-xl font-bold">Delete Zone</button>}
+                        <button type="submit" className="w-full bg-primary text-on-primary py-3 rounded-xl font-bold">Save Zone</button>
                     </div>
                 </form>
             </div>

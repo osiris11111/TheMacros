@@ -31,6 +31,22 @@ export default function Checkout({ setView, cartItems, setCartItems, user, isBag
   const [promoCode, setPromoCode] = useState('');
   const [appliedPromo, setAppliedPromo] = useState<any | null>(null);
   const [promoError, setPromoError] = useState('');
+  const [deliveryZones, setDeliveryZones] = useState<any[]>([]);
+  const [selectedZone, setSelectedZone] = useState<any | null>(null);
+
+  useEffect(() => {
+    const fetchDeliveryZones = async () => {
+      try {
+        const snap = await getDoc(doc(db, 'settings', 'delivery'));
+        if (snap.exists()) {
+          setDeliveryZones(snap.data().zones || []);
+        }
+      } catch (e) {
+        console.error("Error fetching delivery zones", e);
+      }
+    };
+    fetchDeliveryZones();
+  }, []);
 
   const applyPromoCode = async () => {
     if (!promoCode) return;
@@ -117,14 +133,22 @@ export default function Checkout({ setView, cartItems, setCartItems, user, isBag
     }));
   };
 
-  const calculateTotal = () => {
-    let total = cartItems.reduce((sum, item) => sum + (parseFloat(item.price.replace('$', '')) * item.qty), 0);
+  const calculateSubtotal = () => {
+    let subtotal = cartItems.reduce((sum, item) => sum + (parseFloat(item.price.replace('$', '')) * item.qty), 0);
     if (appliedPromo) {
       if (appliedPromo.discountType === 'percentage') {
-        total = total - (total * (appliedPromo.discountValue / 100));
+        subtotal = subtotal - (subtotal * (appliedPromo.discountValue / 100));
       } else if (appliedPromo.discountType === 'fixed') {
-        total = Math.max(0, total - appliedPromo.discountValue);
+        subtotal = Math.max(0, subtotal - appliedPromo.discountValue);
       }
+    }
+    return subtotal;
+  };
+
+  const calculateTotal = () => {
+    let total = calculateSubtotal();
+    if (selectedZone) {
+      total += selectedZone.price;
     }
     return total.toFixed(2);
   };
@@ -133,6 +157,10 @@ export default function Checkout({ setView, cartItems, setCartItems, user, isBag
     e.preventDefault();
     if (cartItems.length === 0) {
       showToast("Cart is empty", "error");
+      return;
+    }
+    if (!selectedZone && deliveryZones.length > 0) {
+      showToast("Please select a delivery area", "error");
       return;
     }
     
@@ -156,6 +184,9 @@ export default function Checkout({ setView, cartItems, setCartItems, user, isBag
     const orderData: any = {
       id: `ORD-${Date.now()}`,
       items: itemsWithoutImg,
+      subtotal: calculateSubtotal().toFixed(2),
+      deliveryFee: selectedZone ? selectedZone.price : 0,
+      deliveryZoneName: selectedZone ? selectedZone.name : '',
       total: calculateTotal(),
       status: 'pending',
       cancellable: true,
@@ -314,6 +345,35 @@ export default function Checkout({ setView, cartItems, setCartItems, user, isBag
         </section>
         
         <section className="bg-surface-container-low p-6 rounded-xl space-y-4">
+            <h2 className="font-bold text-lg">Select Delivery Area</h2>
+            {deliveryZones.length === 0 ? (
+              <p className="text-sm text-on-surface-variant italic">No delivery zones available at the moment.</p>
+            ) : (
+              <div className="space-y-3">
+                {deliveryZones.map(zone => (
+                  <label key={zone.id} className={`flex items-start gap-3 p-4 border rounded-xl cursor-pointer transition-all ${selectedZone?.id === zone.id ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-outline-variant/30 bg-surface hover:border-primary/50'}`}>
+                      <input 
+                        type="radio" 
+                        name="deliveryZone" 
+                        value={zone.id} 
+                        checked={selectedZone?.id === zone.id} 
+                        onChange={() => setSelectedZone(zone)} 
+                        className="mt-1"
+                      /> 
+                      <div className="flex-1">
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="font-bold">{zone.name}</span>
+                          <span className="font-bold text-primary">${zone.price.toFixed(2)}</span>
+                        </div>
+                        {zone.description && <p className="text-xs text-on-surface-variant">{zone.description}</p>}
+                      </div>
+                  </label>
+                ))}
+              </div>
+            )}
+        </section>
+
+        <section className="bg-surface-container-low p-6 rounded-xl space-y-4">
             <h2 className="font-bold text-lg">Payment</h2>
             <div className="space-y-2">
               <label className={`flex items-center gap-3 p-3 border rounded cursor-pointer transition-colors ${paymentMethod === 'pod' ? 'border-primary bg-primary/5' : 'border-outline-variant/30 bg-surface'}`}>
@@ -359,6 +419,27 @@ export default function Checkout({ setView, cartItems, setCartItems, user, isBag
                 Promo applied: {appliedPromo.discountType === 'percentage' ? `${appliedPromo.discountValue}% off` : `$${appliedPromo.discountValue} off`}
               </p>
             )}
+        </section>
+
+        <section className="bg-surface-container-low p-6 rounded-xl space-y-3">
+          <div className="flex justify-between text-sm text-on-surface-variant">
+            <span>Subtotal</span>
+            <span className="font-bold text-on-surface">${calculateSubtotal().toFixed(2)}</span>
+          </div>
+          {appliedPromo && (
+            <div className="flex justify-between text-sm text-green-600">
+              <span>Discount</span>
+              <span className="font-bold">-${(cartItems.reduce((sum, item) => sum + (parseFloat(item.price.replace('$', '')) * item.qty), 0) - calculateSubtotal()).toFixed(2)}</span>
+            </div>
+          )}
+          <div className="flex justify-between text-sm text-on-surface-variant">
+            <span>Delivery Fee {selectedZone ? `(${selectedZone.name})` : ''}</span>
+            <span className="font-bold text-on-surface">{selectedZone ? `$${selectedZone.price.toFixed(2)}` : '---'}</span>
+          </div>
+          <div className="border-t border-outline-variant/30 pt-3 flex justify-between font-bold text-lg mt-2">
+            <span>Total</span>
+            <span className="text-primary">${calculateTotal()}</span>
+          </div>
         </section>
 
         <button type="submit" disabled={loading || cartItems.length === 0} className="w-full bg-primary text-on-primary py-4 rounded-xl font-bold disabled:opacity-50">
