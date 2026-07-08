@@ -30,6 +30,7 @@ export default function Admin({ user, menuItemsList, categoriesList, setMenuItem
   const [macros450, setMacros450] = useState({ protein: '', carbs: '', fats: '' });
   const [macros700, setMacros700] = useState({ protein: '', carbs: '', fats: '' });
   const [editingItemOutOfStock, setEditingItemOutOfStock] = useState(false);
+  const [editingItemIsDeliveryFree, setEditingItemIsDeliveryFree] = useState(false);
   const [editingItemCalories, setEditingItemCalories] = useState('');
   const [editingItemCaloriesLarge, setEditingItemCaloriesLarge] = useState('');
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
@@ -74,6 +75,7 @@ export default function Admin({ user, menuItemsList, categoriesList, setMenuItem
       setEditingItemShowOptions(item.showOptionsOnCard || false);
       setEditingItemCombos(item.comboItems || []);
       setEditingItemOutOfStock(item.outOfStock || false);
+      setEditingItemIsDeliveryFree(item.isDeliveryFree || false);
       setEditingItemCalories(item.calories || '');
       setEditingItemCaloriesLarge(item.caloriesLarge || '');
     } else {
@@ -89,6 +91,7 @@ export default function Admin({ user, menuItemsList, categoriesList, setMenuItem
       setEditingItemShowOptions(false);
       setEditingItemCombos([]);
       setEditingItemOutOfStock(false);
+      setEditingItemIsDeliveryFree(false);
       setEditingItemCalories('');
       setEditingItemCaloriesLarge('');
     }
@@ -278,6 +281,7 @@ export default function Admin({ user, menuItemsList, categoriesList, setMenuItem
       ingredients: formData.get('ingredients'),
       available: editingItem?.available !== false,
       outOfStock: editingItemOutOfStock,
+      isDeliveryFree: editingItemIsDeliveryFree,
       calories: editingItemCalories,
       caloriesLarge: editingItemCaloriesLarge,
       sizes: itemSizes,
@@ -701,7 +705,7 @@ export default function Admin({ user, menuItemsList, categoriesList, setMenuItem
                                   <div className="pt-2 mt-2 border-t border-outline-variant/20">
                                     <div className="flex justify-between mb-1"><span className="text-on-surface-variant">Subtotal:</span> <span>${o.subtotal || o.total}</span></div>
                                     {o.discountAmount && <div className="flex justify-between mb-1 text-green-600"><span className="text-on-surface-variant">Discount:</span> <span>-${o.discountAmount}</span></div>}
-                                    {o.deliveryFee !== undefined && <div className="flex justify-between mb-1"><span className="text-on-surface-variant">Delivery Fee {o.deliveryZoneName ? `(${o.deliveryZoneName})` : ''}:</span> <span>${Number(o.deliveryFee).toFixed(2)}</span></div>}
+                                    {o.deliveryFee !== undefined && <div className="flex justify-between mb-1"><span className="text-on-surface-variant">Delivery Fee {o.deliveryZoneName ? `(${o.deliveryZoneName})` : ''}:</span> <span>{Number(o.deliveryFee) === 0 && o.deliveryZoneName ? <span className="text-green-600 font-bold">$0.00 (Waived)</span> : `$${Number(o.deliveryFee).toFixed(2)}`}</span></div>}
                                     <div className="flex justify-between font-bold text-sm mt-1 pt-1 border-t border-outline-variant/10"><span>Total:</span> <span className="text-primary">${o.total}</span></div>
                                   </div>
                                 </div>
@@ -1157,7 +1161,7 @@ export default function Admin({ user, menuItemsList, categoriesList, setMenuItem
                             <label className="block text-xs font-bold mb-1">Title</label>
                             <input name="title" defaultValue={editingItem.title} required className="w-full p-3 rounded bg-surface-container-low border border-outline-variant/30 text-sm" />
                         </div>
-                        <div className="flex items-center mt-6">
+                        <div className="flex items-center mt-6 gap-6">
                             <label className="flex items-center gap-2 cursor-pointer text-sm">
                                 <input 
                                   type="checkbox"
@@ -1166,6 +1170,15 @@ export default function Admin({ user, menuItemsList, categoriesList, setMenuItem
                                   onChange={e => setEditingItemOutOfStock(e.target.checked)}
                                 />
                                 <span className="font-bold">Mark as Out of Stock</span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer text-sm text-green-600">
+                                <input 
+                                  type="checkbox"
+                                  className="rounded text-green-600"
+                                  checked={editingItemIsDeliveryFree}
+                                  onChange={e => setEditingItemIsDeliveryFree(e.target.checked)}
+                                />
+                                <span className="font-bold">Eligible for Free Delivery</span>
                             </label>
                         </div>
                         <div className="md:col-span-2">

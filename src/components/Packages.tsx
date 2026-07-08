@@ -34,7 +34,8 @@ export default function Packages({ setView, cartItems, setCartItems, isBagOpen, 
         img: modalItem.img, 
         customizations: notes ? `Notes: ${notes}` : '',
         basePrice,
-        specialInstructions: notes
+        specialInstructions: notes,
+        isDeliveryFree: modalItem.isDeliveryFree
       }]);
       
       setModalItem(null);

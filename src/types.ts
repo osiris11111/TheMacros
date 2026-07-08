@@ -8,6 +8,7 @@ export type CartItem = {
   addons?: { id: string; title: string; price: number; type: string; drinkId?: string; qty?: number }[];
   basePrice?: number;
   specialInstructions?: string;
+  isDeliveryFree?: boolean;
 };
 
 export type MenuItem = { 
@@ -24,6 +25,7 @@ export type MenuItem = {
   available?: boolean;
   sizes?: { label: string; price: string; protein?: string; carbs?: string; fats?: string }[];
   originalPrice?: string;
+  isDeliveryFree?: boolean;
   showOptionsOnCard?: boolean;
   allowFriesAndDrink?: boolean;
   allowSauces?: boolean;

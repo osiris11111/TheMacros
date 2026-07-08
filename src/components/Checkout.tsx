@@ -145,9 +145,11 @@ export default function Checkout({ setView, cartItems, setCartItems, user, isBag
     return subtotal;
   };
 
+  const hasFreeDelivery = cartItems.some(item => item.isDeliveryFree);
+
   const calculateTotal = () => {
     let total = calculateSubtotal();
-    if (selectedZone) {
+    if (selectedZone && !hasFreeDelivery) {
       total += selectedZone.price;
     }
     return total.toFixed(2);
@@ -185,7 +187,7 @@ export default function Checkout({ setView, cartItems, setCartItems, user, isBag
       id: `ORD-${Date.now()}`,
       items: itemsWithoutImg,
       subtotal: calculateSubtotal().toFixed(2),
-      deliveryFee: selectedZone ? selectedZone.price : 0,
+      deliveryFee: selectedZone ? (hasFreeDelivery ? 0 : selectedZone.price) : 0,
       deliveryZoneName: selectedZone ? selectedZone.name : '',
       total: calculateTotal(),
       status: 'pending',
@@ -434,7 +436,7 @@ export default function Checkout({ setView, cartItems, setCartItems, user, isBag
           )}
           <div className="flex justify-between text-sm text-on-surface-variant">
             <span>Delivery Fee {selectedZone ? `(${selectedZone.name})` : ''}</span>
-            <span className="font-bold text-on-surface">{selectedZone ? `$${selectedZone.price.toFixed(2)}` : '---'}</span>
+            <span className="font-bold text-on-surface">{selectedZone ? (hasFreeDelivery ? <span className="text-green-600 font-bold">$0.00 (Waived)</span> : `$${selectedZone.price.toFixed(2)}`) : '---'}</span>
           </div>
           <div className="border-t border-outline-variant/30 pt-3 flex justify-between font-bold text-lg mt-2">
             <span>Total</span>

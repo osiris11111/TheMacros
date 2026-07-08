@@ -334,7 +334,8 @@ function Menu({ setView, cartItems, setCartItems, isAdmin, isBagOpen, setIsBagOp
         customizations,
         addons: addonsList,
         basePrice,
-        specialInstructions
+        specialInstructions,
+        isDeliveryFree: modalItem.isDeliveryFree
       }]);
       
       setModalItem(null);
