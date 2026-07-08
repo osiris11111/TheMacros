@@ -180,7 +180,7 @@ export default function Checkout({ setView, cartItems, setCartItems, user, isBag
     
     const itemsWithoutImg = cartItems.map(item => {
       const { img, ...rest } = item;
-      return rest;
+      return Object.fromEntries(Object.entries(rest).filter(([_, v]) => v !== undefined));
     });
 
     const orderData: any = {
