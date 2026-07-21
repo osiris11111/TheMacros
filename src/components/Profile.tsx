@@ -17,6 +17,14 @@ export default function Profile({ user, setView, favorites, menuItemsList, setCa
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
   const [activeTab, setActiveTab] = useState<'orders' | 'favorites'>('orders');
+  const [, setTick] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTick(t => t + 1);
+    }, 60000);
+    return () => clearInterval(timer);
+  }, []);
 
   const handleReorder = (order: any) => {
     const newCartItems = order.items.map((item: any) => {
@@ -162,7 +170,20 @@ export default function Profile({ user, setView, favorites, menuItemsList, setCa
   const confirmCancel = async () => {
     if (cancelOrderId) {
       try {
-        await updateDoc(doc(db, 'orders', cancelOrderId), { status: 'cancelled' });
+        const orderRef = doc(db, 'orders', cancelOrderId);
+        const orderSnap = await getDoc(orderRef);
+        if (orderSnap.exists()) {
+            const data = orderSnap.data();
+            const FIVE_MINUTES = 5 * 60 * 1000;
+            const orderTime = new Date(data.createdAt).getTime();
+            const now = new Date().getTime();
+            if (now - orderTime > FIVE_MINUTES) {
+                alert("You can no longer cancel this order. The 5-minute cancellation window has passed.");
+                setCancelOrderId(null);
+                return;
+            }
+        }
+        await updateDoc(orderRef, { status: 'cancelled' });
         setCancelOrderId(null);
         alert("Order cancelled successfully!");
       } catch (error) {
@@ -180,6 +201,18 @@ export default function Profile({ user, setView, favorites, menuItemsList, setCa
       case 'cancelled': return 100;
       default: return 0;
     }
+  };
+
+  const canCancel = (order: any) => {
+    if (!order.cancellable || (order.status !== 'pending' && order.status !== 'preparing')) return false;
+    if (!order.createdAt) return false;
+    
+    // 5 minutes in milliseconds
+    const FIVE_MINUTES = 5 * 60 * 1000;
+    const orderTime = new Date(order.createdAt).getTime();
+    const now = new Date().getTime();
+    
+    return (now - orderTime) <= FIVE_MINUTES;
   };
 
   return (
@@ -328,7 +361,7 @@ export default function Profile({ user, setView, favorites, menuItemsList, setCa
                     <div className="flex justify-between items-center font-bold border-t border-outline-variant/20 pt-4">
                         <span>Total: ${order.total}</span>
                         <div className="flex gap-4">
-                            {(order.status === 'pending' || order.status === 'preparing') && order.cancellable && (
+                            {canCancel(order) && (
                                 <button onClick={() => setCancelOrderId(order.id)} className="text-error text-sm">Cancel Order</button>
                             )}
                             {order.status === 'completed' && (

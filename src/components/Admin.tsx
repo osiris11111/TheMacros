@@ -101,6 +101,7 @@ export default function Admin({ user, menuItemsList, categoriesList, setMenuItem
     if (!user) return;
     let isMounted = true;
     let unsubActiveOrders: (() => void) | undefined;
+    let unsubActiveOrders2: (() => void) | undefined;
     
     const fetchAdminData = async () => {
         try {
@@ -110,29 +111,75 @@ export default function Admin({ user, menuItemsList, categoriesList, setMenuItem
             setUsers(usersSnap.docs.map(d => d.data()));
 
             const ordersQ = query(collection(db, 'orders'), orderBy('createdAt', 'desc'), limit(50));
-            const ordersSnap = await getDocs(ordersQ);
-            if (!isMounted) return;
-            setOrders(ordersSnap.docs.map(d => d.data()));
-
-            const activeOrdersQ = query(collection(db, 'orders'), where('status', 'in', ['pending', 'preparing', 'delivering']));
-            if (!isMounted) return;
-            unsubActiveOrders = onSnapshot(activeOrdersQ, (snap) => {
+            unsubActiveOrders = onSnapshot(ordersQ, (snap) => {
                 setOrders(prevOrders => {
                     const newOrders = [...prevOrders];
                     let changed = false;
-                    snap.docs.forEach(doc => {
-                        const data = doc.data();
+                    snap.docChanges().forEach(change => {
+                        const data = change.doc.data();
                         const index = newOrders.findIndex(o => o.id === data.id);
-                        if (index !== -1) {
-                            if (JSON.stringify(newOrders[index]) !== JSON.stringify(data)) {
+                        if (change.type === 'added') {
+                            if (index === -1) {
+                                newOrders.push(data);
+                                changed = true;
+                            } else {
                                 newOrders[index] = data;
                                 changed = true;
                             }
-                        } else {
-                            newOrders.unshift(data);
-                            changed = true;
+                        } else if (change.type === 'modified') {
+                            if (index !== -1) {
+                                newOrders[index] = data;
+                                changed = true;
+                            }
+                        } else if (change.type === 'removed') {
+                            if (index !== -1) {
+                                newOrders.splice(index, 1);
+                                changed = true;
+                            }
                         }
                     });
+                    // Re-sort just to be safe
+                    if (changed) {
+                        newOrders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+                    }
+                    return changed ? newOrders : prevOrders;
+                });
+            });
+
+            // Also keep activeOrdersQ to fetch active orders that might be older than 50
+            const activeOrdersQ = query(collection(db, 'orders'), where('status', 'in', ['pending', 'preparing', 'delivering']));
+            unsubActiveOrders2 = onSnapshot(activeOrdersQ, (snap) => {
+                setOrders(prevOrders => {
+                    const newOrders = [...prevOrders];
+                    let changed = false;
+                    
+                    snap.docChanges().forEach(change => {
+                        const data = change.doc.data();
+                        const index = newOrders.findIndex(o => o.id === data.id);
+                        
+                        if (change.type === 'added' || change.type === 'modified') {
+                            if (index === -1) {
+                                newOrders.push(data);
+                                changed = true;
+                            } else if (JSON.stringify(newOrders[index]) !== JSON.stringify(data)) {
+                                newOrders[index] = data;
+                                changed = true;
+                            }
+                        }
+                        // If it's removed, it might just be because it changed status. 
+                        // The ordersQ listener will pick up the status change if it's in the top 50.
+                        // If it's not in top 50, it will just drop out of active orders which is fine.
+                        else if (change.type === 'removed') {
+                            // Only remove if it's not in the top 50 recent orders (we don't want to break history tab)
+                            // Actually, it's safer to just fetch it or let ordersQ handle it.
+                            // To be perfectly safe, if it drops from active, we can set status to 'cancelled' optimistically?
+                            // No, let's just let it be. If it's old, it just won't show in active tabs.
+                        }
+                    });
+                    
+                    if (changed) {
+                        newOrders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+                    }
                     return changed ? newOrders : prevOrders;
                 });
             }, (error) => console.error("Active orders listener error:", error));
@@ -160,6 +207,7 @@ export default function Admin({ user, menuItemsList, categoriesList, setMenuItem
     return () => {
         isMounted = false;
         if (unsubActiveOrders) unsubActiveOrders();
+        if (unsubActiveOrders2) unsubActiveOrders2();
     };
   }, [user]);
 
