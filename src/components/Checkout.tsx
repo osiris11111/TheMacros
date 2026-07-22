@@ -7,6 +7,7 @@ import { MenuItem, MenuCategory, CartItem, OperationType } from '../types';
 import { showToast, handleFirestoreError } from '../lib/utils';
 import { getToken } from 'firebase/messaging';
 import { CachedImage } from '../App';
+import emailjs from '@emailjs/browser';
 
 export default function Checkout({ setView, cartItems, setCartItems, user, isBagOpen, setIsBagOpen }: { setView: (v: string) => void, cartItems: CartItem[], setCartItems: React.Dispatch<React.SetStateAction<CartItem[]>>, user: User | null, isBagOpen: boolean, setIsBagOpen: (v: boolean) => void }) {
   const [loading, setLoading] = useState(false);
@@ -246,6 +247,21 @@ export default function Checkout({ setView, cartItems, setCartItems, user, isBag
 
     try {
       await setDoc(doc(db, 'orders', orderData.id), orderData);
+
+      emailjs.send(
+        'service_ri0lihi', 
+        'template_7yq6b1g',
+        {
+            order_id: orderData.id,
+            total: orderData.total,
+            customer_name: orderData.deliveryDetails.name,
+            customer_email: orderData.deliveryDetails.email,
+            customer_phone: orderData.deliveryDetails.phone,
+            delivery_address: orderData.deliveryDetails.address,
+            items: orderData.items.map((i: any) => `${i.qty}x ${i.title}`).join(', ')
+        },
+        'pCs9os_TqmPdnkuSk'
+      ).catch(err => console.error('Failed to send email notification:', err));
 
       // Save order ID to localStorage for guest tracking
       if (!user) {
